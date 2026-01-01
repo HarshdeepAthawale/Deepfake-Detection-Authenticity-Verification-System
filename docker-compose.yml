@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: deepfake-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: deepfake-detection
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - deepfake-network
+
+  # Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: deepfake-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      NODE_ENV: production
+      MONGODB_URI: mongodb://mongodb:27017/deepfake-detection
+      DB_NAME: deepfake-detection
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-key-in-production-minimum-32-characters-long-please}
+      JWT_EXPIRES_IN: 24h
+      JWT_REFRESH_EXPIRES_IN: 7d
+      MAX_FILE_SIZE: 500000000
+      UPLOAD_PATH: ./uploads
+      ALLOWED_MIME_TYPES: video/mp4,video/avi,video/mov,video/webm,audio/mpeg,audio/wav,audio/mp3,image/jpeg,image/png
+      BCRYPT_ROUNDS: 12
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-32-character-encryption-key-please}
+      ENCRYPTION_IV: ${ENCRYPTION_IV:-change-this-16}
+      LOG_LEVEL: info
+      LOG_FILE_PATH: ./logs/app.log
+      RATE_LIMIT_WINDOW_MS: 900000
+      RATE_LIMIT_MAX_REQUESTS: 100
+      FRONTEND_URL: http://localhost:3000
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_logs:/app/logs
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - deepfake-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      start_period: 40s
+      retries: 3
+
+  # Frontend Next.js Application
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: deepfake-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - deepfake-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      start_period: 40s
+      retries: 3
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  backend_uploads:
+    driver: local
+  backend_logs:
+    driver: local
+
+networks:
+  deepfake-network:
+    driver: bridge
+
