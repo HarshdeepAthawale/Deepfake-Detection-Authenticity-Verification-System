@@ -6,6 +6,7 @@
 import { authenticateUser, registerUser } from './auth.service.js';
 import { authenticateWithGoogle } from './google-auth.service.js';
 import logger from '../utils/logger.js';
+import config from '../config/env.js';
 
 /**
  * Login endpoint handler
@@ -161,15 +162,26 @@ export const googleAuth = async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error('Google authentication error:', error);
+    logger.error('Google authentication error:', {
+      message: error.message,
+      stack: error.stack,
+    });
     
-    const statusCode = error.message.includes('Invalid') || error.message.includes('Failed')
-      ? 401
-      : 500;
+    // Determine status code based on error type
+    let statusCode = 500;
+    if (error.message.includes('Invalid') || 
+        error.message.includes('Failed') || 
+        error.message.includes('mismatch') ||
+        error.message.includes('not verified')) {
+      statusCode = 401;
+    } else if (error.message.includes('required') || error.message.includes('Validation')) {
+      statusCode = 400;
+    }
 
     res.status(statusCode).json({
       error: 'Google authentication failed',
       message: error.message || 'An error occurred during Google authentication',
+      ...(config.server.nodeEnv === 'development' && { details: error.stack }),
     });
   }
 };

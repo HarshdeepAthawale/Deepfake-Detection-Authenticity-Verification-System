@@ -1,4 +1,4 @@
-# 🐳 Docker Setup Guide
+# Docker Setup Guide
 
 This guide explains how to run the Deepfake Detection System using Docker and Docker Compose.
 
@@ -31,7 +31,7 @@ ENCRYPTION_IV=your-16-character-iv
 # MONGODB_URI=mongodb://mongodb:27017/deepfake-detection
 ```
 
-**⚠️ Important:** Change the secrets in production! Never commit `.env` files with real secrets.
+**Important:** Change the secrets in production! Never commit `.env` files with real secrets.
 
 ### 3. Build and Start Services
 
@@ -344,7 +344,7 @@ services:
 
 ---
 
-**Ready to deploy!** 🚀
+**Ready to deploy!**
 
 For more information, see:
 - [Backend README](./backend/README.md)

@@ -125,10 +125,9 @@ userSchema.methods.toJSON = function () {
 };
 
 // Indexes
-userSchema.index({ email: 1 });
-userSchema.index({ operativeId: 1 });
+// Note: email, operativeId, and googleId already have indexes from 'unique: true'
+// Only add explicit indexes for non-unique fields
 userSchema.index({ role: 1 });
-userSchema.index({ googleId: 1 });
 
 const User = mongoose.model('User', userSchema);
 

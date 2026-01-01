@@ -16,20 +16,45 @@ import logger from '../utils/logger.js';
  */
 export const verifyGoogleToken = async (idToken) => {
   try {
+    if (!idToken) {
+      throw new Error('Google ID token is required');
+    }
+
     // Verify token with Google's tokeninfo endpoint
     const response = await fetch(
       `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`
     );
 
     if (!response.ok) {
-      throw new Error('Invalid Google token');
+      const errorText = await response.text().catch(() => 'Unknown error');
+      logger.error('Google tokeninfo API error:', { status: response.status, error: errorText });
+      throw new Error(`Invalid Google token: ${response.status} ${errorText}`);
     }
 
     const tokenInfo = await response.json();
 
-    // Verify the token is for our app
-    if (config.google.clientId && tokenInfo.aud !== config.google.clientId) {
-      throw new Error('Token audience mismatch');
+    // Check for error in response
+    if (tokenInfo.error) {
+      logger.error('Google tokeninfo error:', tokenInfo);
+      throw new Error(`Google token verification failed: ${tokenInfo.error_description || tokenInfo.error}`);
+    }
+
+    // Verify the token is for our app (only if client ID is configured)
+    if (config.google.clientId) {
+      if (tokenInfo.aud !== config.google.clientId) {
+        logger.error('Token audience mismatch:', {
+          expected: config.google.clientId,
+          received: tokenInfo.aud
+        });
+        throw new Error('Token audience mismatch - client ID does not match');
+      }
+    } else {
+      logger.warn('Google client ID not configured - skipping audience verification');
+    }
+
+    // Validate required fields
+    if (!tokenInfo.sub || !tokenInfo.email) {
+      throw new Error('Invalid token: missing required user information');
     }
 
     return {
@@ -42,8 +67,11 @@ export const verifyGoogleToken = async (idToken) => {
       familyName: tokenInfo.family_name,
     };
   } catch (error) {
-    logger.error('Google token verification error:', error);
-    throw new Error('Failed to verify Google token');
+    logger.error('Google token verification error:', {
+      message: error.message,
+      stack: error.stack
+    });
+    throw error;
   }
 };
 
@@ -64,6 +92,10 @@ export const authenticateWithGoogle = async (idToken) => {
     // Check if user exists by Google ID
     let user = await User.findOne({ googleId: googleUser.googleId });
 
+    // Admin email - always assign admin role
+    const ADMIN_EMAIL = config.admin.email;
+    const isAdminEmail = ADMIN_EMAIL && googleUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
     if (!user) {
       // Check if user exists by email (for linking accounts)
       user = await User.findOne({ email: googleUser.email.toLowerCase() });
@@ -72,30 +104,43 @@ export const authenticateWithGoogle = async (idToken) => {
         // Link Google account to existing user
         user.googleId = googleUser.googleId;
         user.authProvider = 'google';
+        // Preserve admin role if it's the admin email
+        if (isAdminEmail && user.role !== ROLES.ADMIN) {
+          user.role = ROLES.ADMIN;
+        }
         await user.save();
       } else {
         // Create new user
         const timestamp = Date.now().toString(36).toUpperCase();
         const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const operativeId = `USER_${timestamp}_${random}`;
+        const operativeId = isAdminEmail ? 'ADMIN_1' : `USER_${timestamp}_${random}`;
 
         user = new User({
           email: googleUser.email.toLowerCase(),
           googleId: googleUser.googleId,
           operativeId: operativeId,
-          role: ROLES.OPERATIVE,
+          role: isAdminEmail ? ROLES.ADMIN : ROLES.OPERATIVE,
           authProvider: 'google',
           isActive: true,
           metadata: {
             firstName: googleUser.givenName || '',
             lastName: googleUser.familyName || '',
+            ...(isAdminEmail && {
+              department: 'IT',
+              clearanceLevel: 'TOP_SECRET',
+            }),
           },
         });
 
         await user.save();
-        logger.info(`Google user registered: ${user.operativeId} (${user.email})`);
+        logger.info(`Google user registered: ${user.operativeId} (${user.email}) - Role: ${user.role}`);
       }
     } else {
+      // Update role if it's admin email and user doesn't have admin role
+      if (isAdminEmail && user.role !== ROLES.ADMIN) {
+        user.role = ROLES.ADMIN;
+        await user.save();
+      }
       // Update last login
       user.lastLogin = new Date();
       await user.save({ validateBeforeSave: false });

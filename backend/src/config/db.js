@@ -22,7 +22,7 @@ export const connectDB = async () => {
     // Modern Mongoose doesn't need these options (removed deprecated options)
     await mongoose.connect(config.database.uri);
     isConnected = true;
-    logger.info(`✅ MongoDB connected: ${config.database.name}`);
+    logger.info(`MongoDB connected: ${config.database.name}`);
 
     mongoose.connection.on('error', (err) => {
       logger.error('MongoDB connection error:', err);

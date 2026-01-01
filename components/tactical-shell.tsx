@@ -1,10 +1,11 @@
 "use client"
 
 import type React from "react"
-import { Shield, Activity, Terminal, Lock, LogOut } from "lucide-react"
+import { Shield, Activity, Terminal, Lock, LogOut, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 export function TacticalShell({
   children,
@@ -45,9 +46,12 @@ export function TacticalShell({
         </div>
 
         <nav className="flex-1 py-4 flex flex-col gap-2 px-2">
-          <NavItem icon={<Activity size={18} />} label="Mission Control" active={activeTab === "dashboard"} />
-          <NavItem icon={<Terminal size={18} />} label="Media Scanner" active={activeTab === "scanner"} />
-          <NavItem icon={<Lock size={18} />} label="Evidence Vault" active={activeTab === "vault"} />
+          <NavItem icon={<Activity size={18} />} label="Mission Control" active={activeTab === "dashboard"} href="/dashboard" />
+          <NavItem icon={<Terminal size={18} />} label="Media Scanner" active={activeTab === "scanner"} href="/scanner" />
+          <NavItem icon={<Lock size={18} />} label="Evidence Vault" active={activeTab === "vault"} href="/vault" />
+          {user?.role === "admin" && (
+            <NavItem icon={<Settings size={18} />} label="Admin Panel" active={activeTab === "admin"} href="/admin" />
+          )}
         </nav>
 
         <div className="p-4 border-t border-primary/20">
@@ -125,19 +129,33 @@ export function TacticalShell({
   )
 }
 
-function NavItem({ icon, label, active }: { icon: React.ReactNode; label: string; active?: boolean }) {
-  return (
-    <button
-      className={cn(
-        "flex items-center gap-3 p-3 rounded-sm transition-all relative group",
-        active
-          ? "bg-primary/10 text-primary border-l-2 border-primary"
-          : "text-muted-foreground hover:bg-primary/5 hover:text-foreground",
-      )}
-    >
+function NavItem({ icon, label, active, href }: { icon: React.ReactNode; label: string; active?: boolean; href?: string }) {
+  const content = (
+    <>
       {icon}
       <span className="hidden md:block text-[11px] font-bold">{label}</span>
       {active && <div className="absolute right-2 w-1 h-1 bg-primary rounded-full animate-pulse md:block hidden" />}
+    </>
+  )
+
+  const className = cn(
+    "flex items-center gap-3 p-3 rounded-sm transition-all relative group w-full text-left",
+    active
+      ? "bg-primary/10 text-primary border-l-2 border-primary"
+      : "text-muted-foreground hover:bg-primary/5 hover:text-foreground",
+  )
+
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {content}
+      </Link>
+    )
+  }
+
+  return (
+    <button className={className}>
+      {content}
     </button>
   )
 }

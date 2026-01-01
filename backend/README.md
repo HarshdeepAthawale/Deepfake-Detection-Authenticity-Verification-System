@@ -1,4 +1,4 @@
-# 🚀 Deepfake Detection Backend
+# Deepfake Detection Backend
 
 **Agentic Deepfake Detection & Authenticity Verification Backend**
 
@@ -6,7 +6,7 @@ A secure, offline-first Node.js backend for deepfake detection with agentic AI o
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Features](#features)
 - [Tech Stack](#tech-stack)
@@ -20,28 +20,28 @@ A secure, offline-first Node.js backend for deepfake detection with agentic AI o
 
 ---
 
-## ✨ Features
+## Features
 
-- 🔐 **JWT Authentication** with role-based access control (RBAC)
-- 🤖 **Agentic AI Pipeline** with 4 specialized agents:
+- **JWT Authentication** with role-based access control (RBAC)
+- **Agentic AI Pipeline** with 4 specialized agents:
   - Perception Agent (media preprocessing)
   - Detection Agent (deepfake inference)
   - Compression Agent (artifact analysis)
   - Cognitive Agent (human-readable explanations)
-- 📁 **File Upload** with integrity verification
-- 🔒 **Security Features**:
+- **File Upload** with integrity verification
+- **Security Features**:
   - Encrypted storage
   - SHA-256 file hashing
   - Rate limiting
   - Helmet security headers
   - Input validation
-- 📊 **MongoDB** for persistent storage
-- 📝 **Comprehensive Logging** with Winston
-- 🎬 **FFmpeg Integration** for media processing
+- **MongoDB** for persistent storage
+- **Comprehensive Logging** with Winston
+- **FFmpeg Integration** for media processing
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Runtime**: Node.js (ES Modules)
 - **Framework**: Express.js
@@ -55,7 +55,7 @@ A secure, offline-first Node.js backend for deepfake detection with agentic AI o
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 backend/
@@ -98,7 +98,7 @@ backend/
 
 ---
 
-## 🚀 Setup
+## Setup
 
 ### Prerequisites
 
@@ -164,7 +164,7 @@ npm start
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -192,11 +192,11 @@ ENCRYPTION_KEY=your-32-character-encryption-key
 ENCRYPTION_IV=your-16-character-iv
 ```
 
-**⚠️ Important:** Change all secrets in production!
+**Important:** Change all secrets in production!
 
 ---
 
-## 📡 API Endpoints
+## API Endpoints
 
 ### Authentication
 
@@ -329,7 +329,7 @@ Get scan details by ID.
 
 ---
 
-## 🤖 Agentic Pipeline
+## Agentic Pipeline
 
 The backend uses a 4-agent pipeline for deepfake detection:
 
@@ -359,7 +359,7 @@ The backend uses a 4-agent pipeline for deepfake detection:
 
 ---
 
-## 🔒 Security
+## Security
 
 ### Authentication & Authorization
 
@@ -381,7 +381,7 @@ The backend uses a 4-agent pipeline for deepfake detection:
 
 ---
 
-## 👥 User Roles
+## User Roles
 
 ### Admin
 - Full system access
@@ -401,7 +401,7 @@ The backend uses a 4-agent pipeline for deepfake detection:
 
 ---
 
-## 🧪 Creating Test Users
+## Creating Test Users
 
 You can create users directly in MongoDB or via a script:
 
@@ -424,7 +424,7 @@ await admin.save();
 
 ---
 
-## 📝 Logging
+## Logging
 
 Logs are written to:
 - **Console** (development)
@@ -435,7 +435,7 @@ Log levels: `error`, `warn`, `info`, `debug`
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### FFmpeg not found
 - Ensure FFmpeg is installed and in PATH
@@ -453,7 +453,7 @@ Log levels: `error`, `warn`, `info`, `debug`
 
 ---
 
-## 🚧 Future Enhancements
+## Future Enhancements
 
 - [ ] Real ML model integration (Python/TensorFlow)
 - [ ] WebSocket support for real-time scan updates
@@ -467,17 +467,17 @@ Log levels: `error`, `warn`, `info`, `debug`
 
 ---
 
-## 📄 License
+## License
 
 MIT
 
 ---
 
-## 👤 Author
+## Author
 
 Built for Agentic Deepfake Detection Platform
 
 ---
 
-**🔥 Ready for tactical field deployment. No shortcuts taken.**
+**Ready for tactical field deployment. No shortcuts taken.**
 

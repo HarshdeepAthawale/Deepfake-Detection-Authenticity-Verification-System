@@ -11,8 +11,10 @@ import logger from '../src/utils/logger.js';
 const users = [
   {
     email: 'harshdeepathawale27@gmail.com',
+    // No password - Google Auth only
     operativeId: 'ADMIN_1',
     role: ROLES.ADMIN,
+    authProvider: 'google',
     metadata: {
       firstName: 'System',
       lastName: 'Administrator',
@@ -35,7 +37,7 @@ const seedUsers = async () => {
     for (const userData of users) {
       // Prevent creating multiple admins
       if (userData.role === ROLES.ADMIN && existingAdmin) {
-        logger.info(`⚠️  Admin already exists. Skipping admin creation: ${userData.email}`);
+        logger.info(`Admin already exists. Skipping admin creation: ${userData.email}`);
         continue;
       }
 
@@ -54,18 +56,20 @@ const seedUsers = async () => {
 
       const user = new User(userData);
       await user.save();
-      logger.info(`✅ Created user: ${userData.email} (${userData.operativeId}) - Role: ${userData.role}`);
+      logger.info(`Created user: ${userData.email} (${userData.operativeId}) - Role: ${userData.role}`);
     }
 
-    logger.info('✅ User seeding completed!');
-    logger.info('\n📋 Default Admin User:');
+    logger.info('User seeding completed!');
+    logger.info('\nDefault Admin User:');
     logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     const adminUser = users.find(u => u.role === ROLES.ADMIN);
     if (adminUser) {
       logger.info(`Email: ${adminUser.email}`);
+      logger.info(`Password: ${adminUser.password || 'NOT_SET'}`);
       logger.info(`Operative ID: ${adminUser.operativeId}`);
       logger.info(`Role: ${adminUser.role}`);
       logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      logger.info('IMPORTANT: Change the default password after first login!');
     }
 
     process.exit(0);

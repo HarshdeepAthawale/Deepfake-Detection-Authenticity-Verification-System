@@ -1,4 +1,4 @@
-# 🔌 Frontend-Backend API Integration Guide
+# Frontend-Backend API Integration Guide
 
 This guide helps you connect your Next.js frontend to the Node.js backend.
 
@@ -312,13 +312,13 @@ try {
 
 ## Next Steps
 
-1. ✅ Update frontend API calls
-2. ✅ Test authentication flow
-3. ✅ Test file uploads
-4. ✅ Test scan history
-5. 🚀 Deploy both frontend and backend
+1. Update frontend API calls
+2. Test authentication flow
+3. Test file uploads
+4. Test scan history
+5. Deploy both frontend and backend
 
 ---
 
-**Ready to integrate!** 🎉
+**Ready to integrate!**
 

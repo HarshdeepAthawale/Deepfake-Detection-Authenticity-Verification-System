@@ -32,22 +32,6 @@ export default function LoginPage() {
           <LoginForm />
         </div>
 
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex gap-4 text-[10px] font-mono text-muted-foreground uppercase">
-            <span className="flex items-center gap-1">
-              <div className="w-1.5 h-1.5 bg-success rounded-full" />
-              Srv_01: Online
-            </span>
-            <span className="flex items-center gap-1">
-              <div className="w-1.5 h-1.5 bg-success rounded-full" />
-              Srv_02: Online
-            </span>
-            <span className="flex items-center gap-1 text-warning">
-              <div className="w-1.5 h-1.5 bg-warning rounded-full animate-pulse" />
-              Uplink: Encrypted
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   )

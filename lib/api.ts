@@ -349,6 +349,151 @@ export const apiService = {
       poll()
     })
   },
+
+  /**
+   * Admin: Get all users with pagination
+   */
+  async getAllUsers(
+    page: number = 1,
+    limit: number = 20,
+    filters?: {
+      role?: string
+      isActive?: boolean | string
+      search?: string
+    }
+  ): Promise<PaginatedResponse<any>> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(filters?.role && { role: filters.role }),
+      ...(filters?.isActive !== undefined && { isActive: filters.isActive.toString() }),
+      ...(filters?.search && { search: filters.search }),
+    })
+
+    return authenticatedRequest(`/users?${params.toString()}`)
+  },
+
+  /**
+   * Admin: Get user by ID
+   */
+  async getUserById(userId: string): Promise<{ success: boolean; data: any }> {
+    return authenticatedRequest(`/users/${userId}`)
+  },
+
+  /**
+   * Admin: Create new user
+   */
+  async createUser(userData: {
+    email: string
+    password?: string
+    operativeId?: string
+    role?: string
+    isActive?: boolean
+    metadata?: {
+      firstName?: string
+      lastName?: string
+      department?: string
+      clearanceLevel?: string
+    }
+  }): Promise<{ success: boolean; data: any; message: string }> {
+    return authenticatedRequest(`/users`, {
+      method: "POST",
+      body: JSON.stringify(userData),
+    })
+  },
+
+  /**
+   * Admin: Update user
+   */
+  async updateUser(
+    userId: string,
+    userData: {
+      email?: string
+      password?: string
+      operativeId?: string
+      role?: string
+      isActive?: boolean
+      metadata?: {
+        firstName?: string
+        lastName?: string
+        department?: string
+        clearanceLevel?: string
+      }
+    }
+  ): Promise<{ success: boolean; data: any; message: string }> {
+    return authenticatedRequest(`/users/${userId}`, {
+      method: "PUT",
+      body: JSON.stringify(userData),
+    })
+  },
+
+  /**
+   * Admin: Delete user
+   */
+  async deleteUser(userId: string): Promise<{ success: boolean; message: string }> {
+    return authenticatedRequest(`/users/${userId}`, {
+      method: "DELETE",
+    })
+  },
+
+  /**
+   * Admin: Get user statistics
+   */
+  async getUserStats(): Promise<{
+    success: boolean
+    data: {
+      total: number
+      active: number
+      inactive: number
+      byRole: {
+        admin: number
+        operative: number
+        analyst: number
+      }
+    }
+  }> {
+    return authenticatedRequest(`/users/stats`)
+  },
+
+  /**
+   * Admin: Get system-wide statistics
+   */
+  async getAdminStats(): Promise<{
+    success: boolean
+    data: {
+      users: {
+        total: number
+        active: number
+        inactive: number
+        byRole: {
+          admin: number
+          operative: number
+          analyst: number
+        }
+        newLast24h: number
+      }
+      scans: {
+        total: number
+        completed: number
+        pending: number
+        processing: number
+        failed: number
+        byVerdict: {
+          DEEPFAKE: number
+          SUSPICIOUS: number
+          AUTHENTIC: number
+        }
+        byMediaType: Record<string, number>
+        newLast24h: number
+      }
+      system: {
+        health: string
+        uptime: number
+      }
+    }
+  }> {
+    return authenticatedRequest(`/admin/stats`)
+  },
 }
 
 // Legacy export for backward compatibility

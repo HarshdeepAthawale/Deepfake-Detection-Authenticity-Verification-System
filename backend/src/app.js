@@ -13,6 +13,8 @@ import logger from './utils/logger.js';
 // Import routes
 import authRoutes from './auth/auth.routes.js';
 import scanRoutes from './scans/scan.routes.js';
+import userRoutes from './users/user.routes.js';
+import adminRoutes from './admin/admin.routes.js';
 
 const app = express();
 
@@ -23,8 +25,8 @@ app.use(helmet({
 
 // CORS configuration
 // Allow multiple origins for development (ports 3000-3005)
-const allowedOrigins = process.env.FRONTEND_URL 
-  ? [process.env.FRONTEND_URL]
+const allowedOrigins = config.frontend.url 
+  ? [config.frontend.url]
   : [
       'http://localhost:3000',
       'http://localhost:3001',
@@ -89,6 +91,8 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/scans', scanRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 handler
 app.use((req, res) => {

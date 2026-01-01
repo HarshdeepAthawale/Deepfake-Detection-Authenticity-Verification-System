@@ -53,15 +53,31 @@ const config = {
     clientId: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
   },
+  admin: {
+    email: process.env.ADMIN_EMAIL || '',
+  },
+  frontend: {
+    url: process.env.FRONTEND_URL || 'http://localhost:3002',
+  },
 };
 
 // Validation
 if (!config.jwt.secret || config.jwt.secret.length < 32) {
-  console.warn('⚠️  WARNING: JWT_SECRET should be at least 32 characters long');
+  console.warn('WARNING: JWT_SECRET should be at least 32 characters long');
 }
 
 if (!config.security.encryptionKey || config.security.encryptionKey.length < 32) {
-  console.warn('⚠️  WARNING: ENCRYPTION_KEY should be at least 32 characters long');
+  console.warn('WARNING: ENCRYPTION_KEY should be at least 32 characters long');
+}
+
+// Google OAuth validation
+if (!config.google.clientId) {
+  console.warn('⚠️  WARNING: GOOGLE_CLIENT_ID is not set. Google OAuth will not work.');
+  console.warn('   Create backend/.env with: GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com');
+}
+
+if (config.google.clientId && !config.google.clientSecret) {
+  console.warn('⚠️  WARNING: GOOGLE_CLIENT_SECRET is not set. Token verification may fail.');
 }
 
 export default config;
