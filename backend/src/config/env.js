@@ -59,6 +59,9 @@ const config = {
   frontend: {
     url: process.env.FRONTEND_URL || 'http://localhost:3002',
   },
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+  },
 };
 
 // Validation

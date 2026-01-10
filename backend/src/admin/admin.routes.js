@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { getAdminStats } from './admin.controller.js';
+import { getAdminStats, getMLHealth, getMLConfigEndpoint } from './admin.controller.js';
 import { authenticate } from '../auth/auth.middleware.js';
 import { requirePermission, PERMISSIONS } from '../security/rbac.js';
 
@@ -22,6 +22,28 @@ router.get(
   '/stats',
   requirePermission(PERMISSIONS.SYSTEM_ADMIN),
   getAdminStats
+);
+
+/**
+ * @route   GET /api/admin/ml/health
+ * @desc    Get ML service health status
+ * @access  Private (requires system:admin permission)
+ */
+router.get(
+  '/ml/health',
+  requirePermission(PERMISSIONS.SYSTEM_ADMIN),
+  getMLHealth
+);
+
+/**
+ * @route   GET /api/admin/ml/config
+ * @desc    Get ML service configuration
+ * @access  Private (requires system:admin permission)
+ */
+router.get(
+  '/ml/config',
+  requirePermission(PERMISSIONS.SYSTEM_ADMIN),
+  getMLConfigEndpoint
 );
 
 export default router;

@@ -8,6 +8,11 @@ import { connectDB } from './config/db.js';
 import config from './config/env.js';
 import logger from './utils/logger.js';
 import { createServer } from 'http';
+import { Server } from 'socket.io';
+import { initializeSocket, setupSocketHandlers } from './scans/scan.socket.js';
+import { createScanQueue } from './utils/queue.js';
+import { setupScanProcessor } from './scans/scan.processor.js';
+import { startHealthChecks } from './ml/ml-client.js';
 
 const PORT = config.server.port;
 
@@ -49,13 +54,79 @@ const startServer = async () => {
     logger.info('Connecting to database...');
     await connectDB();
 
-    // Start Express server
-    const server = app.listen(PORT, () => {
+    // Initialize scan queue and processor (optional - gracefully handles if Redis unavailable)
+    try {
+      const scanQueue = createScanQueue();
+      if (scanQueue) {
+        setupScanProcessor(scanQueue);
+        logger.info('[SERVER] Scan queue processor initialized');
+      } else {
+        logger.warn('[SERVER] Scan queue not available (Redis may not be running). Batch processing will use direct processing.');
+      }
+    } catch (error) {
+      logger.warn('[SERVER] Failed to initialize scan queue:', error.message);
+      logger.warn('[SERVER] Batch processing will use direct processing as fallback.');
+    }
+
+    // Initialize ML service health checks (optional - gracefully handles if ML service unavailable)
+    try {
+      startHealthChecks();
+      logger.info('[SERVER] ML service health checks started');
+    } catch (error) {
+      logger.warn('[SERVER] Failed to start ML service health checks:', error.message);
+      logger.warn('[SERVER] ML service integration will use fallback detection.');
+    }
+
+    // Create HTTP server
+    const httpServer = createServer(app);
+
+    // Initialize Socket.IO
+    const allowedOrigins = config.frontend.url 
+      ? [config.frontend.url]
+      : [
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'http://localhost:3002',
+          'http://localhost:3003',
+          'http://localhost:3004',
+          'http://localhost:3005',
+        ];
+
+    const io = new Server(httpServer, {
+      cors: {
+        origin: (origin, callback) => {
+          if (!origin) return callback(null, true);
+          if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+          } else if (process.env.NODE_ENV === 'development' && origin.includes('localhost')) {
+            callback(null, true);
+          } else {
+            callback(new Error('Not allowed by CORS'));
+          }
+        },
+        credentials: true,
+        methods: ['GET', 'POST'],
+      },
+    });
+
+    // Initialize socket handlers
+    initializeSocket(io);
+
+    // Setup Socket.IO connection handlers
+    io.on('connection', (socket) => {
+      setupSocketHandlers(socket);
+    });
+
+    // Start HTTP server with Socket.IO
+    httpServer.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
       logger.info(`Environment: ${config.server.nodeEnv}`);
       logger.info(`Health check: http://localhost:${PORT}/health`);
       logger.info(`API base: http://localhost:${PORT}/api`);
+      logger.info(`WebSocket server: ws://localhost:${PORT}`);
     });
+
+    const server = httpServer;
 
     // Handle server errors
     server.on('error', (error) => {

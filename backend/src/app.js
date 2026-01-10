@@ -15,6 +15,7 @@ import authRoutes from './auth/auth.routes.js';
 import scanRoutes from './scans/scan.routes.js';
 import userRoutes from './users/user.routes.js';
 import adminRoutes from './admin/admin.routes.js';
+import reportRoutes from './reports/report.routes.js';
 
 const app = express();
 
@@ -93,6 +94,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/scans', scanRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/reports', reportRoutes);
 
 // 404 handler
 app.use((req, res) => {

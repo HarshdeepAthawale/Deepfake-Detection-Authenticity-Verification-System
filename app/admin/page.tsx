@@ -141,19 +141,36 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  <div className="bg-primary/5 border border-primary/20 rounded-sm p-6 text-center space-y-4">
-                    <Users className="w-8 h-8 text-primary mx-auto" />
-                    <div className="space-y-1">
-                      <h3 className="text-xs font-bold text-primary uppercase">User Management</h3>
-                      <p className="text-[10px] text-muted-foreground uppercase leading-tight">
-                        Manage system users and permissions.
-                      </p>
+                  <div className="space-y-4">
+                    <div className="bg-primary/5 border border-primary/20 rounded-sm p-6 text-center space-y-4">
+                      <Users className="w-8 h-8 text-primary mx-auto" />
+                      <div className="space-y-1">
+                        <h3 className="text-xs font-bold text-primary uppercase">User Management</h3>
+                        <p className="text-[10px] text-muted-foreground uppercase leading-tight">
+                          Manage system users and permissions.
+                        </p>
+                      </div>
+                      <Link href="/admin/users" className="block">
+                        <button className="w-full bg-primary/20 hover:bg-primary/30 border border-primary/40 text-primary text-[10px] font-bold py-2 transition-all uppercase tracking-widest cursor-pointer">
+                          Manage Users
+                        </button>
+                      </Link>
                     </div>
-                    <Link href="/admin/users" className="block">
-                      <button className="w-full bg-primary/20 hover:bg-primary/30 border border-primary/40 text-primary text-[10px] font-bold py-2 transition-all uppercase tracking-widest cursor-pointer">
-                        Manage Users
-                      </button>
-                    </Link>
+
+                    <div className="bg-primary/5 border border-primary/20 rounded-sm p-6 text-center space-y-4">
+                      <Brain className="w-8 h-8 text-primary mx-auto" />
+                      <div className="space-y-1">
+                        <h3 className="text-xs font-bold text-primary uppercase">ML Service Config</h3>
+                        <p className="text-[10px] text-muted-foreground uppercase leading-tight">
+                          Configure ML service integration and monitor health.
+                        </p>
+                      </div>
+                      <Link href="/admin/ml" className="block">
+                        <button className="w-full bg-primary/20 hover:bg-primary/30 border border-primary/40 text-primary text-[10px] font-bold py-2 transition-all uppercase tracking-widest cursor-pointer">
+                          ML Config
+                        </button>
+                      </Link>
+                    </div>
                   </div>
                 </div>
 

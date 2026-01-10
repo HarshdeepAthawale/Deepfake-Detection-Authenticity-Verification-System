@@ -99,6 +99,15 @@ const scanSchema = new mongoose.Schema(
       message: String,
       stack: String,
     },
+    tags: {
+      type: [String],
+      default: [],
+      index: true,
+    },
+    batchId: {
+      type: String,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -111,8 +120,18 @@ scanSchema.index({ userId: 1, createdAt: -1 });
 scanSchema.index({ operativeId: 1, createdAt: -1 });
 scanSchema.index({ status: 1, createdAt: -1 });
 scanSchema.index({ 'result.status': 1 });
+scanSchema.index({ 'result.verdict': 1 });
 scanSchema.index({ fileHash: 1 });
 scanSchema.index({ createdAt: -1 });
+scanSchema.index({ tags: 1 });
+scanSchema.index({ mediaType: 1 });
+
+// Text index for full-text search
+scanSchema.index({ 
+  fileName: 'text', 
+  'result.explanations': 'text',
+  operativeId: 'text',
+});
 
 const Scan = mongoose.model('Scan', scanSchema);
 

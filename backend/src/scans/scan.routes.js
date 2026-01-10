@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { uploadScan, getScan, getHistory, deleteScanHandler, upload } from './scan.controller.js';
+import { uploadScan, batchUploadScan, getScan, getHistory, updateTags, deleteScanHandler, upload, uploadMultiple } from './scan.controller.js';
 import { authenticate } from '../auth/auth.middleware.js';
 import { requirePermission, PERMISSIONS } from '../security/rbac.js';
 
@@ -23,6 +23,18 @@ router.post(
   requirePermission(PERMISSIONS.SCAN_UPLOAD),
   upload.single('file'),
   uploadScan
+);
+
+/**
+ * @route   POST /api/scans/batch
+ * @desc    Batch upload multiple media files for deepfake detection
+ * @access  Private (requires scan:upload permission)
+ */
+router.post(
+  '/batch',
+  requirePermission(PERMISSIONS.SCAN_UPLOAD),
+  uploadMultiple.array('files', 50), // Max 50 files
+  batchUploadScan
 );
 
 /**
@@ -45,6 +57,17 @@ router.get(
   '/:id',
   requirePermission(PERMISSIONS.SCAN_VIEW),
   getScan
+);
+
+/**
+ * @route   PATCH /api/scans/:id/tags
+ * @desc    Update scan tags
+ * @access  Private (requires scan:edit permission)
+ */
+router.patch(
+  '/:id/tags',
+  requirePermission(PERMISSIONS.SCAN_EDIT),
+  updateTags
 );
 
 /**

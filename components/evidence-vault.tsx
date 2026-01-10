@@ -5,8 +5,9 @@ import { Search, Filter, Download, ExternalLink, FileText, Database, AlertTriang
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { apiService, type ScanHistoryItem } from "@/lib/api"
+import { apiService, type ScanHistoryItem, type ScanFilters } from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
+import { ExportMenu } from "@/components/reports/export-menu"
 
 export function EvidenceVault() {
   const { isAuthenticated } = useAuth()
@@ -18,10 +19,21 @@ export function EvidenceVault() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const [filters, setFilters] = useState<{
+    search?: string
     status?: string
     mediaType?: string
     verdict?: string
+    startDate?: string
+    endDate?: string
+    tags?: string[]
+    minConfidence?: number
+    maxConfidence?: number
+    minRiskScore?: number
+    maxRiskScore?: number
+    sortBy?: "date" | "confidence" | "riskScore" | "fileName"
+    sortOrder?: "asc" | "desc"
   }>({})
+  const [showFilters, setShowFilters] = useState(false)
 
   const loadScans = async () => {
     if (!isAuthenticated) {
@@ -32,7 +44,12 @@ export function EvidenceVault() {
     try {
       setLoading(true)
       setError(null)
-      const response = await apiService.getScanHistory(page, 20, filters)
+      // Include search query in filters for backend full-text search
+      const searchFilters = {
+        ...filters,
+        search: search || undefined,
+      }
+      const response = await apiService.getScanHistory(page, 20, searchFilters)
       
       if (response.success) {
         setScans(response.data || [])
@@ -51,17 +68,22 @@ export function EvidenceVault() {
 
   useEffect(() => {
     loadScans()
-  }, [page, filters, isAuthenticated])
+  }, [page, filters, search, isAuthenticated])
 
-  const filteredScans = scans.filter((scan) => {
-    if (!search) return true
-    const searchLower = search.toLowerCase()
-    return (
-      scan.id.toLowerCase().includes(searchLower) ||
-      scan.hash.toLowerCase().includes(searchLower) ||
-      scan.operative.toLowerCase().includes(searchLower)
-    )
-  })
+  // Debounce search to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (search !== undefined) {
+        setPage(1)
+        loadScans()
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [search])
+
+  // Backend handles filtering now, so no need for client-side filtering
+  const filteredScans = scans
 
   const handleViewDetails = async (scanId: string) => {
     try {
@@ -97,44 +119,166 @@ export function EvidenceVault() {
   return (
     <div className="space-y-6">
       {/* Search and Filters Bar */}
-      <div className="flex flex-wrap gap-4 items-center justify-between bg-card/30 border border-primary/10 p-4 rounded-sm backdrop-blur-sm">
-        <div className="relative flex-1 min-w-[300px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-primary/40" size={16} />
-          <Input
-            placeholder="SEARCH_BY_ID_HASH_OR_OPERATIVE..."
-            className="bg-background/50 border-primary/20 pl-10 font-mono text-[10px] uppercase tracking-widest focus-visible:ring-primary/40"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-4 items-center justify-between bg-card/30 border border-primary/10 p-4 rounded-sm backdrop-blur-sm">
+          <div className="relative flex-1 min-w-[300px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-primary/40" size={16} />
+            <Input
+              placeholder="SEARCH_BY_FILENAME_HASH_OPERATIVE_OR_EXPLANATIONS..."
+              className="bg-background/50 border-primary/20 pl-10 font-mono text-[10px] uppercase tracking-widest focus-visible:ring-primary/40"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setPage(1)
+                  loadScans()
+                }
+              }}
+            />
+          </div>
+          <div className="flex gap-2">
+            <ExportMenu filters={filters as ScanFilters} bulkExport={true} />
+            <Button 
+              variant="outline" 
+              className="border-primary/20 bg-transparent text-primary text-[10px] font-bold h-9"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter size={14} className="mr-2" />
+              {showFilters ? "HIDE_FILTERS" : "SHOW_FILTERS"}
+            </Button>
+            <Button 
+              variant="outline" 
+              className="border-primary/20 bg-transparent text-primary text-[10px] font-bold h-9"
+              onClick={() => {
+                setSearch("")
+                setFilters({})
+                setPage(1)
+              }}
+            >
+              CLEAR
+            </Button>
+            <Button 
+              variant="outline" 
+              className="border-primary/20 bg-transparent text-primary text-[10px] font-bold h-9"
+              onClick={loadScans}
+              disabled={loading}
+            >
+              <RefreshCcw size={14} className={`mr-2 ${loading ? "animate-spin" : ""}`} />
+              REFRESH
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            className="border-primary/20 bg-transparent text-primary text-[10px] font-bold h-9"
-            onClick={() => {
-              const newFilters = { ...filters }
-              if (filters.verdict) {
-                delete newFilters.verdict
-              } else {
-                newFilters.verdict = "DEEPFAKE"
-              }
-              setFilters(newFilters)
-              setPage(1)
-            }}
-          >
-            <Filter size={14} className="mr-2" />
-            {filters.verdict ? `FILTER: ${filters.verdict}` : "FILTER_PARAMETERS"}
-          </Button>
-          <Button 
-            variant="outline" 
-            className="border-primary/20 bg-transparent text-primary text-[10px] font-bold h-9"
-            onClick={loadScans}
-            disabled={loading}
-          >
-            <RefreshCcw size={14} className={`mr-2 ${loading ? "animate-spin" : ""}`} />
-            REFRESH
-          </Button>
-        </div>
+
+        {/* Advanced Filters Panel */}
+        {showFilters && (
+          <div className="bg-card/30 border border-primary/10 p-4 rounded-sm backdrop-blur-sm space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Status Filter */}
+              <div>
+                <label className="text-[10px] font-mono text-primary uppercase mb-2 block">STATUS</label>
+                <select
+                  className="w-full bg-background/50 border border-primary/20 rounded px-3 py-2 text-[11px] font-mono"
+                  value={filters.status || ""}
+                  onChange={(e) => setFilters({ ...filters, status: e.target.value || undefined })}
+                >
+                  <option value="">ALL</option>
+                  <option value="PENDING">PENDING</option>
+                  <option value="PROCESSING">PROCESSING</option>
+                  <option value="COMPLETED">COMPLETED</option>
+                  <option value="FAILED">FAILED</option>
+                </select>
+              </div>
+
+              {/* Media Type Filter */}
+              <div>
+                <label className="text-[10px] font-mono text-primary uppercase mb-2 block">MEDIA_TYPE</label>
+                <select
+                  className="w-full bg-background/50 border border-primary/20 rounded px-3 py-2 text-[11px] font-mono"
+                  value={filters.mediaType || ""}
+                  onChange={(e) => setFilters({ ...filters, mediaType: e.target.value || undefined })}
+                >
+                  <option value="">ALL</option>
+                  <option value="VIDEO">VIDEO</option>
+                  <option value="AUDIO">AUDIO</option>
+                  <option value="IMAGE">IMAGE</option>
+                </select>
+              </div>
+
+              {/* Verdict Filter */}
+              <div>
+                <label className="text-[10px] font-mono text-primary uppercase mb-2 block">VERDICT</label>
+                <select
+                  className="w-full bg-background/50 border border-primary/20 rounded px-3 py-2 text-[11px] font-mono"
+                  value={filters.verdict || ""}
+                  onChange={(e) => setFilters({ ...filters, verdict: e.target.value || undefined })}
+                >
+                  <option value="">ALL</option>
+                  <option value="DEEPFAKE">DEEPFAKE</option>
+                  <option value="SUSPICIOUS">SUSPICIOUS</option>
+                  <option value="AUTHENTIC">AUTHENTIC</option>
+                </select>
+              </div>
+
+              {/* Sort By */}
+              <div>
+                <label className="text-[10px] font-mono text-primary uppercase mb-2 block">SORT_BY</label>
+                <select
+                  className="w-full bg-background/50 border border-primary/20 rounded px-3 py-2 text-[11px] font-mono"
+                  value={filters.sortBy || "date"}
+                  onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as any })}
+                >
+                  <option value="date">DATE</option>
+                  <option value="confidence">CONFIDENCE</option>
+                  <option value="riskScore">RISK_SCORE</option>
+                  <option value="fileName">FILENAME</option>
+                </select>
+              </div>
+
+              {/* Sort Order */}
+              <div>
+                <label className="text-[10px] font-mono text-primary uppercase mb-2 block">SORT_ORDER</label>
+                <select
+                  className="w-full bg-background/50 border border-primary/20 rounded px-3 py-2 text-[11px] font-mono"
+                  value={filters.sortOrder || "desc"}
+                  onChange={(e) => setFilters({ ...filters, sortOrder: e.target.value as any })}
+                >
+                  <option value="desc">DESCENDING</option>
+                  <option value="asc">ASCENDING</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Active Filter Chips */}
+        {(filters.status || filters.mediaType || filters.verdict || search) && (
+          <div className="flex flex-wrap gap-2">
+            {search && (
+              <div className="bg-primary/20 border border-primary/40 px-3 py-1 rounded text-[10px] font-mono flex items-center gap-2">
+                <span>SEARCH: {search}</span>
+                <button onClick={() => setSearch("")} className="hover:text-primary">×</button>
+              </div>
+            )}
+            {filters.status && (
+              <div className="bg-primary/20 border border-primary/40 px-3 py-1 rounded text-[10px] font-mono flex items-center gap-2">
+                <span>STATUS: {filters.status}</span>
+                <button onClick={() => setFilters({ ...filters, status: undefined })} className="hover:text-primary">×</button>
+              </div>
+            )}
+            {filters.mediaType && (
+              <div className="bg-primary/20 border border-primary/40 px-3 py-1 rounded text-[10px] font-mono flex items-center gap-2">
+                <span>TYPE: {filters.mediaType}</span>
+                <button onClick={() => setFilters({ ...filters, mediaType: undefined })} className="hover:text-primary">×</button>
+              </div>
+            )}
+            {filters.verdict && (
+              <div className="bg-primary/20 border border-primary/40 px-3 py-1 rounded text-[10px] font-mono flex items-center gap-2">
+                <span>VERDICT: {filters.verdict}</span>
+                <button onClick={() => setFilters({ ...filters, verdict: undefined })} className="hover:text-primary">×</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Error Display */}
@@ -198,6 +342,7 @@ export function EvidenceVault() {
                 <div className="col-span-3 text-muted-foreground truncate font-mono text-[10px]">{item.hash}</div>
                 <div className="col-span-1 text-muted-foreground uppercase">{item.operative}</div>
                 <div className="col-span-1 flex justify-end gap-2">
+                  <ExportMenu scanId={item.id} />
                   <button 
                     className="text-primary hover:text-white p-1 transition-colors" 
                     title="View Full Report"
@@ -210,7 +355,7 @@ export function EvidenceVault() {
                     title="Delete Scan"
                     onClick={() => handleDelete(item.id)}
                   >
-                    <Download size={16} />
+                    <AlertTriangle size={16} />
                   </button>
                 </div>
               </div>

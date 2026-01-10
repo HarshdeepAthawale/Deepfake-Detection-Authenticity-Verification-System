@@ -10,10 +10,13 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import {
   generateScanId,
+  generateBatchId,
   createScan,
   processScan,
+  processBatchUpload,
   getScanById,
   getScanHistory,
+  updateScanTags,
   deleteScan,
 } from './scan.service.js';
 import { generateFileHash } from '../security/encryption.js';
@@ -52,6 +55,15 @@ export const upload = multer({
   storage,
   limits: {
     fileSize: config.upload.maxFileSize,
+  },
+  fileFilter,
+});
+
+export const uploadMultiple = multer({
+  storage,
+  limits: {
+    fileSize: config.upload.maxFileSize,
+    files: 50, // Max 50 files per batch
   },
   fileFilter,
 });
@@ -103,8 +115,8 @@ export const uploadScan = async (req, res) => {
 
     const scan = await createScan(scanData);
 
-    // Process scan asynchronously
-    processScan(scanId, file.path).catch((error) => {
+    // Process scan asynchronously (pass userId for WebSocket targeting)
+    processScan(scanId, file.path, user.id).catch((error) => {
       logger.error(`Async scan processing failed for ${scanId}:`, error);
     });
 
@@ -132,6 +144,67 @@ export const uploadScan = async (req, res) => {
     res.status(500).json({
       error: 'Upload failed',
       message: error.message || 'An error occurred during file upload',
+    });
+  }
+};
+
+/**
+ * Batch upload and process multiple media files
+ * POST /api/scans/batch
+ */
+export const batchUploadScan = async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'No files uploaded',
+      });
+    }
+
+    const user = req.user;
+    const files = req.files;
+    const batchId = req.body.batchId || generateBatchId();
+
+    // Limit batch size (max 50 files)
+    if (files.length > 50) {
+      // Clean up uploaded files
+      files.forEach(file => {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      });
+
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'Maximum 50 files allowed per batch',
+      });
+    }
+
+    // Process batch
+    const batchResult = await processBatchUpload(files, user.id, user.operativeId, batchId);
+
+    logger.info(`Batch uploaded: ${batchResult.batchId} with ${files.length} files by ${user.operativeId}`);
+
+    res.status(202).json({
+      success: true,
+      message: 'Files uploaded and batch processing started',
+      data: batchResult,
+    });
+  } catch (error) {
+    logger.error('Batch upload error:', error);
+    
+    // Clean up uploaded files on error
+    if (req.files && Array.isArray(req.files)) {
+      req.files.forEach(file => {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      });
+    }
+
+    res.status(500).json({
+      error: 'Batch upload failed',
+      message: error.message || 'An error occurred during batch upload',
     });
   }
 };
@@ -182,22 +255,71 @@ export const getScan = async (req, res) => {
 };
 
 /**
- * Get scan history
+ * Get scan history with advanced search and filtering
  * GET /api/scans/history
+ * Query parameters:
+ * - page: Page number (default: 1)
+ * - limit: Items per page (default: 20)
+ * - search: Full-text search query
+ * - status: Filter by status (PENDING, PROCESSING, COMPLETED, FAILED)
+ * - mediaType: Filter by media type (VIDEO, AUDIO, IMAGE, UNKNOWN)
+ * - verdict: Filter by verdict (DEEPFAKE, SUSPICIOUS, AUTHENTIC)
+ * - startDate: Start date for date range filter (ISO format)
+ * - endDate: End date for date range filter (ISO format)
+ * - tags: Comma-separated tags or array
+ * - operativeId: Filter by operative ID (admin only)
+ * - minConfidence: Minimum confidence score (0-100)
+ * - maxConfidence: Maximum confidence score (0-100)
+ * - minRiskScore: Minimum risk score (0-100)
+ * - maxRiskScore: Maximum risk score (0-100)
+ * - latitude: GPS latitude for location filtering
+ * - longitude: GPS longitude for location filtering
+ * - radius: GPS radius in km for location filtering
+ * - sortBy: Sort field (date, confidence, riskScore, fileName)
+ * - sortOrder: Sort order (asc, desc)
  */
 export const getHistory = async (req, res) => {
   try {
     const user = req.user;
     const page = parseInt(req.query.page || '1', 10);
-    const limit = parseInt(req.query.limit || '20', 10);
+    const limit = Math.min(parseInt(req.query.limit || '20', 10), 100); // Max 100 items per page
     
+    // Parse tags (can be comma-separated string or array)
+    let tags = [];
+    if (req.query.tags) {
+      if (Array.isArray(req.query.tags)) {
+        tags = req.query.tags;
+      } else if (typeof req.query.tags === 'string') {
+        tags = req.query.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      }
+    }
+
     const filters = {
+      search: req.query.search,
       status: req.query.status,
       mediaType: req.query.mediaType,
       verdict: req.query.verdict,
       startDate: req.query.startDate,
       endDate: req.query.endDate,
+      tags: tags.length > 0 ? tags : undefined,
+      operativeId: req.query.operativeId,
+      minConfidence: req.query.minConfidence,
+      maxConfidence: req.query.maxConfidence,
+      minRiskScore: req.query.minRiskScore,
+      maxRiskScore: req.query.maxRiskScore,
+      latitude: req.query.latitude,
+      longitude: req.query.longitude,
+      radius: req.query.radius,
+      sortBy: req.query.sortBy,
+      sortOrder: req.query.sortOrder || 'desc',
     };
+
+    // Remove undefined filters
+    Object.keys(filters).forEach(key => {
+      if (filters[key] === undefined) {
+        delete filters[key];
+      }
+    });
 
     const result = await getScanHistory(filters, user.id, user.role, page, limit);
 
@@ -208,9 +330,14 @@ export const getHistory = async (req, res) => {
       type: scan.mediaType,
       result: scan.result?.verdict || 'PENDING',
       score: scan.result?.confidence || 0,
+      riskScore: scan.result?.riskScore || 0,
       hash: scan.fileHash,
       operative: scan.operativeId,
       status: scan.status,
+      fileName: scan.fileName,
+      tags: scan.tags || [],
+      gpsCoordinates: scan.gpsCoordinates || null,
+      explanations: scan.result?.explanations || [],
     }));
 
     res.status(200).json({
@@ -222,6 +349,42 @@ export const getHistory = async (req, res) => {
     logger.error('Get scan history error:', error);
     res.status(500).json({
       error: 'Failed to retrieve scan history',
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * Update scan tags
+ * PATCH /api/scans/:id/tags
+ */
+export const updateTags = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tags } = req.body;
+    const user = req.user;
+
+    if (!tags || !Array.isArray(tags)) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'Tags must be an array',
+      });
+    }
+
+    const scan = await updateScanTags(id, tags, user.id, user.role);
+
+    res.status(200).json({
+      success: true,
+      message: 'Scan tags updated successfully',
+      data: {
+        scanId: scan.scanId,
+        tags: scan.tags,
+      },
+    });
+  } catch (error) {
+    logger.error('Update scan tags error:', error);
+    res.status(error.message === 'Scan not found or access denied' ? 404 : 500).json({
+      error: 'Failed to update scan tags',
       message: error.message,
     });
   }
@@ -253,8 +416,12 @@ export const deleteScanHandler = async (req, res) => {
 
 export default {
   uploadScan,
+  batchUploadScan,
   getScan,
   getHistory,
+  updateTags,
   deleteScanHandler,
+  upload,
+  uploadMultiple,
 };
 

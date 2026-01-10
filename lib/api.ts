@@ -34,9 +34,37 @@ export interface ScanHistoryItem {
   type: string
   result: "AUTHENTIC" | "DEEPFAKE" | "SUSPICIOUS" | "PENDING"
   score: number
+  riskScore?: number
   hash: string
   operative: string
   status: string
+  fileName?: string
+  tags?: string[]
+  gpsCoordinates?: {
+    latitude: number
+    longitude: number
+  } | null
+  explanations?: string[]
+}
+
+export interface ScanFilters {
+  search?: string
+  status?: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED"
+  mediaType?: "VIDEO" | "AUDIO" | "IMAGE" | "UNKNOWN"
+  verdict?: "DEEPFAKE" | "SUSPICIOUS" | "AUTHENTIC"
+  startDate?: string
+  endDate?: string
+  tags?: string[]
+  operativeId?: string
+  minConfidence?: number
+  maxConfidence?: number
+  minRiskScore?: number
+  maxRiskScore?: number
+  latitude?: number
+  longitude?: number
+  radius?: number
+  sortBy?: "date" | "confidence" | "riskScore" | "fileName"
+  sortOrder?: "asc" | "desc"
 }
 
 export interface PaginatedResponse<T> {
@@ -258,6 +286,69 @@ export const apiService = {
   },
 
   /**
+   * Batch upload multiple media files for scanning
+   */
+  async batchUploadScan(
+    files: File[],
+    onProgress?: (progress: number) => void
+  ): Promise<{ success: boolean; data: { batchId: string; totalFiles: number; scansCreated: number; scans: Array<{ scanId?: string; fileName: string; mediaType?: string; status?: string; error?: string }> } }> {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('files', file);
+    });
+
+    const token = getToken();
+    const xhr = new XMLHttpRequest();
+
+    return new Promise((resolve, reject) => {
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable && onProgress) {
+          const percentComplete = (e.loaded / e.total) * 100;
+          onProgress(percentComplete);
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response);
+          } catch (error) {
+            reject(new Error('Failed to parse response'));
+          }
+        } else {
+          try {
+            const error = JSON.parse(xhr.responseText);
+            reject(new Error(error.message || 'Upload failed'));
+          } catch {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during upload'));
+      });
+
+      xhr.open('POST', `${API_BASE_URL}/scans/batch`);
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+      xhr.send(formData);
+    });
+  },
+
+  /**
+   * Get scan by ID (alias for getScanDetails)
+   */
+  async getScan(scanId: string): Promise<{
+    success: boolean
+    data: ScanResult
+  }> {
+    return this.getScanDetails(scanId);
+  },
+
+  /**
    * Get scan details by ID
    */
   async getScanDetails(scanId: string): Promise<{
@@ -268,26 +359,52 @@ export const apiService = {
   },
 
   /**
-   * Get scan history with pagination
+   * Get scan history with pagination and advanced search/filtering
    */
   async getScanHistory(
     page: number = 1,
     limit: number = 20,
-    filters?: {
-      status?: string
-      mediaType?: string
-      verdict?: string
-    }
+    filters?: ScanFilters
   ): Promise<PaginatedResponse<ScanHistoryItem>> {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      ...(filters?.status && { status: filters.status }),
-      ...(filters?.mediaType && { mediaType: filters.mediaType }),
-      ...(filters?.verdict && { verdict: filters.verdict }),
     })
 
+    // Add all filter parameters
+    if (filters) {
+      if (filters.search) params.append('search', filters.search)
+      if (filters.status) params.append('status', filters.status)
+      if (filters.mediaType) params.append('mediaType', filters.mediaType)
+      if (filters.verdict) params.append('verdict', filters.verdict)
+      if (filters.startDate) params.append('startDate', filters.startDate)
+      if (filters.endDate) params.append('endDate', filters.endDate)
+      if (filters.tags && filters.tags.length > 0) {
+        params.append('tags', filters.tags.join(','))
+      }
+      if (filters.operativeId) params.append('operativeId', filters.operativeId)
+      if (filters.minConfidence !== undefined) params.append('minConfidence', filters.minConfidence.toString())
+      if (filters.maxConfidence !== undefined) params.append('maxConfidence', filters.maxConfidence.toString())
+      if (filters.minRiskScore !== undefined) params.append('minRiskScore', filters.minRiskScore.toString())
+      if (filters.maxRiskScore !== undefined) params.append('maxRiskScore', filters.maxRiskScore.toString())
+      if (filters.latitude !== undefined) params.append('latitude', filters.latitude.toString())
+      if (filters.longitude !== undefined) params.append('longitude', filters.longitude.toString())
+      if (filters.radius !== undefined) params.append('radius', filters.radius.toString())
+      if (filters.sortBy) params.append('sortBy', filters.sortBy)
+      if (filters.sortOrder) params.append('sortOrder', filters.sortOrder)
+    }
+
     return authenticatedRequest(`/scans/history?${params.toString()}`)
+  },
+
+  /**
+   * Update scan tags
+   */
+  async updateScanTags(scanId: string, tags: string[]): Promise<{ success: boolean; message: string; data: { scanId: string; tags: string[] } }> {
+    return authenticatedRequest(`/scans/${scanId}/tags`, {
+      method: "PATCH",
+      body: JSON.stringify({ tags }),
+    })
   },
 
   /**
@@ -297,6 +414,79 @@ export const apiService = {
     return authenticatedRequest(`/scans/${scanId}`, {
       method: "DELETE",
     })
+  },
+
+  /**
+   * Export scan as PDF
+   */
+  async exportScanPDF(scanId: string): Promise<Blob> {
+    const token = getToken()
+    const response = await fetch(`${API_BASE_URL}/reports/scans/${scanId}/pdf`, {
+      method: "GET",
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to export PDF")
+    }
+
+    return response.blob()
+  },
+
+  /**
+   * Export scan as JSON
+   */
+  async exportScanJSON(scanId: string): Promise<Blob> {
+    const token = getToken()
+    const response = await fetch(`${API_BASE_URL}/reports/scans/${scanId}/json`, {
+      method: "GET",
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to export JSON")
+    }
+
+    return response.blob()
+  },
+
+  /**
+   * Export scans as CSV (bulk export)
+   */
+  async exportScansCSV(filters?: ScanFilters, limit: number = 1000): Promise<Blob> {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+    })
+
+    if (filters) {
+      if (filters.search) params.append('search', filters.search)
+      if (filters.status) params.append('status', filters.status)
+      if (filters.mediaType) params.append('mediaType', filters.mediaType)
+      if (filters.verdict) params.append('verdict', filters.verdict)
+      if (filters.startDate) params.append('startDate', filters.startDate)
+      if (filters.endDate) params.append('endDate', filters.endDate)
+      if (filters.tags && filters.tags.length > 0) {
+        params.append('tags', filters.tags.join(','))
+      }
+    }
+
+    const token = getToken()
+    const response = await fetch(`${API_BASE_URL}/reports/scans/csv?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to export CSV")
+    }
+
+    return response.blob()
   },
 
   /**
@@ -493,6 +683,40 @@ export const apiService = {
     }
   }> {
     return authenticatedRequest(`/admin/stats`)
+  },
+
+  /**
+   * Admin: Get ML service health status
+   */
+  async getMLHealth(): Promise<{
+    success: boolean
+    data: {
+      enabled: boolean
+      healthy: boolean
+      serviceUrl: string
+      modelVersion: string
+      confidenceThreshold: number
+      lastChecked: string
+    }
+  }> {
+    return authenticatedRequest(`/admin/ml/health`)
+  },
+
+  /**
+   * Admin: Get ML service configuration
+   */
+  async getMLConfig(): Promise<{
+    success: boolean
+    data: {
+      serviceUrl: string
+      enabled: boolean
+      timeout: number
+      retries: number
+      modelVersion: string
+      confidenceThreshold: number
+    }
+  }> {
+    return authenticatedRequest(`/admin/ml/config`)
   },
 }
 

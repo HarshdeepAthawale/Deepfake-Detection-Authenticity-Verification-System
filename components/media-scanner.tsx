@@ -18,9 +18,11 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { apiService, type ScanResult } from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
+import { initializeSocket, subscribeToScan, unsubscribeFromScan, getSocket, disconnectSocket } from "@/lib/socket"
+import { useEffect, useRef } from "react"
 
 export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanResult | null) => void }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user, token } = useAuth()
   const [scanning, setScanning] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [scanProgress, setScanProgress] = useState(0)
@@ -30,8 +32,31 @@ export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanRes
   const [currentScanId, setCurrentScanId] = useState<string | null>(null)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const [mediaType, setMediaType] = useState<"image" | "video" | "audio" | null>(null)
+  const [batchMode, setBatchMode] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [batchResults, setBatchResults] = useState<Array<{ fileName: string; scanId?: string; status: string; error?: string }>>([])
+  const [batchId, setBatchId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const socketInitialized = useRef(false)
+
+  // Initialize Socket.IO when authenticated
+  useEffect(() => {
+    if (isAuthenticated && user && token && !socketInitialized.current) {
+      initializeSocket(token, user.id)
+      socketInitialized.current = true
+    }
+
+    return () => {
+      // Cleanup on unmount - but don't disconnect as other components may use it
+      if (currentScanId) {
+        unsubscribeFromScan(currentScanId)
+      }
+      if (mediaPreview) {
+        URL.revokeObjectURL(mediaPreview)
+      }
+    }
+  }, [isAuthenticated, user, token])
 
   // Cleanup object URL on unmount
   useEffect(() => {
@@ -43,30 +68,83 @@ export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanRes
   }, [mediaPreview])
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+    const files = Array.from(event.target.files || [])
+    if (files.length === 0) return
 
     if (!isAuthenticated) {
       setError("Please log in to upload files")
       return
     }
 
-    // Create preview URL for the file
-    const previewUrl = URL.createObjectURL(file)
-    setMediaPreview(previewUrl)
-    
-    // Determine media type
-    if (file.type.startsWith('image/')) {
-      setMediaType('image')
-    } else if (file.type.startsWith('video/')) {
-      setMediaType('video')
-    } else if (file.type.startsWith('audio/')) {
-      setMediaType('audio')
+    if (batchMode || files.length > 1) {
+      // Batch upload mode
+      setSelectedFiles(files)
+      await handleBatchUpload(files)
     } else {
-      setMediaType(null)
-    }
+      // Single file upload mode
+      const file = files[0]
+      // Create preview URL for the file
+      const previewUrl = URL.createObjectURL(file)
+      setMediaPreview(previewUrl)
+      
+      // Determine media type
+      if (file.type.startsWith('image/')) {
+        setMediaType('image')
+      } else if (file.type.startsWith('video/')) {
+        setMediaType('video')
+      } else if (file.type.startsWith('audio/')) {
+        setMediaType('audio')
+      } else {
+        setMediaType(null)
+      }
 
-    await uploadAndScan(file)
+      await uploadAndScan(file)
+    }
+  }
+
+  const handleBatchUpload = async (files: File[]) => {
+    try {
+      setError(null)
+      setStatus("uploading")
+      setScanning(true)
+      setUploadProgress(0)
+      setBatchResults([])
+
+      // Limit batch size
+      if (files.length > 50) {
+        throw new Error("Maximum 50 files allowed per batch")
+      }
+
+      // Upload batch
+      const batchResponse = await apiService.batchUploadScan(files, (progress) => {
+        setUploadProgress(progress)
+      })
+
+      if (!batchResponse.success) {
+        throw new Error("Batch upload failed")
+      }
+
+      setBatchId(batchResponse.data.batchId)
+      setStatus("processing")
+      setUploadProgress(100)
+      
+      // Set batch results
+      setBatchResults(batchResponse.data.scans || [])
+      
+      // Note: Individual scan progress will be updated via WebSocket
+      // For now, we'll show batch status
+      setTimeout(() => {
+        setStatus("complete")
+        setScanning(false)
+      }, 1000)
+
+    } catch (err) {
+      console.error("Batch upload error:", err)
+      setError(err instanceof Error ? err.message : "Batch upload failed")
+      setStatus("error")
+      setScanning(false)
+      setUploadProgress(0)
+    }
   }
 
   const uploadAndScan = async (file: File) => {
@@ -90,29 +168,101 @@ export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanRes
       setCurrentScanId(scanId)
       setStatus("processing")
       setUploadProgress(100)
+      setScanProgress(10)
 
-      // Poll scan status until completion
-      const finalResult = await apiService.pollScanStatus(
-        scanId,
-        (currentStatus) => {
-          // Update progress based on status
-          if (currentStatus === "PENDING") {
-            setScanProgress(20)
-          } else if (currentStatus === "PROCESSING") {
-            setScanProgress(60)
-          }
-        },
-        60, // max attempts
-        2000 // 2 second interval
-      )
+      // Use WebSocket for real-time updates instead of polling
+      const socket = getSocket()
+      if (!socket || !socket.connected) {
+        // Fallback to polling if WebSocket not available
+        console.warn('[MEDIA_SCANNER] WebSocket not available, falling back to polling')
+        const finalResult = await apiService.pollScanStatus(
+          scanId,
+          (currentStatus) => {
+            if (currentStatus === "PENDING") {
+              setScanProgress(20)
+            } else if (currentStatus === "PROCESSING") {
+              setScanProgress(60)
+            }
+          },
+          60,
+          2000
+        )
 
-      setScanProgress(100)
-      setStatus("complete")
-      setScanning(false)
-      setResult(finalResult)
-      if (onScanResult) {
-        onScanResult(finalResult)
+        setScanProgress(100)
+        setStatus("complete")
+        setScanning(false)
+        setResult(finalResult)
+        if (onScanResult) {
+          onScanResult(finalResult)
+        }
+        return
       }
+
+      // Subscribe to scan updates via WebSocket
+      await new Promise<void>((resolve, reject) => {
+        let timeoutId: NodeJS.Timeout | null = null
+        let completed = false
+
+        const handleUpdate = (data: any) => {
+          if (completed) return
+
+          console.log('[MEDIA_SCANNER] Received scan update:', data)
+
+          if (data.type === 'progress') {
+            setScanProgress(data.progress || 50)
+            if (data.stage) {
+              console.log('[MEDIA_SCANNER] Processing stage:', data.stage)
+            }
+          } else if (data.type === 'complete') {
+            completed = true
+            if (timeoutId) clearTimeout(timeoutId)
+            
+            // Fetch full scan result from API
+            apiService.getScan(scanId).then((response) => {
+              if (response.success && response.data) {
+                const finalResult = response.data
+                setScanProgress(100)
+                setStatus("complete")
+                setScanning(false)
+                setResult(finalResult)
+                if (onScanResult) {
+                  onScanResult(finalResult)
+                }
+                unsubscribeFn()
+                resolve()
+              } else {
+                unsubscribeFn()
+                reject(new Error('Failed to fetch scan result'))
+              }
+            }).catch((err) => {
+              unsubscribeFn()
+              reject(err)
+            })
+          } else if (data.type === 'failed') {
+            completed = true
+            if (timeoutId) clearTimeout(timeoutId)
+            setStatus("error")
+            setScanning(false)
+            setError(data.error?.message || "Scan failed")
+            unsubscribeFn()
+            reject(new Error(data.error?.message || "Scan failed"))
+          }
+        }
+
+        // Subscribe to scan and get unsubscribe function
+        const unsubscribeFn = subscribeToScan(scanId, handleUpdate)
+
+        // Set timeout fallback (5 minutes max wait)
+        timeoutId = setTimeout(() => {
+          if (completed) return
+          completed = true
+          unsubscribeFn()
+          setStatus("error")
+          setScanning(false)
+          setError("Scan timeout - please check scan status manually")
+          reject(new Error("Scan timeout"))
+        }, 5 * 60 * 1000)
+      })
     } catch (err) {
       console.error("Scan error:", err)
       setError(err instanceof Error ? err.message : "Scan failed")
@@ -134,6 +284,9 @@ export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanRes
     setResult(null)
     setError(null)
     setCurrentScanId(null)
+    setSelectedFiles([])
+    setBatchResults([])
+    setBatchId(null)
     if (mediaPreview) {
       URL.revokeObjectURL(mediaPreview)
       setMediaPreview(null)
@@ -289,50 +442,108 @@ export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanRes
         )}
 
         {/* Controls */}
-        <div className="flex gap-4">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="video/*,audio/*,image/*"
-            onChange={handleFileSelect}
-            className="hidden"
-            disabled={status !== "idle"}
-          />
-          <Button
-            onClick={handleUploadClick}
-            disabled={status !== "idle" || !isAuthenticated}
-            className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest h-14 rounded-sm"
-          >
-            {status === "idle" ? (
-              <>
-                <Upload className="mr-2" size={18} />
-                Upload & Scan Media
-              </>
-            ) : status === "uploading" ? (
-              <>
-                <Upload className="mr-2 animate-pulse" size={18} />
-                Uploading... {Math.round(uploadProgress)}%
-              </>
-            ) : status === "processing" ? (
-              <>
-                <Play className="mr-2 animate-pulse" size={18} />
-                Processing... {Math.round(scanProgress)}%
-              </>
-            ) : (
-              <>
-                <Play className="mr-2" size={18} />
-                Scan Complete
-              </>
+        <div className="space-y-4">
+          <div className="flex gap-2 items-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBatchMode(!batchMode)}
+              disabled={status !== "idle"}
+              className={cn(
+                "border-primary/20 text-primary text-[10px] font-bold h-8",
+                batchMode && "bg-primary/20 border-primary/40"
+              )}
+            >
+              {batchMode ? "BATCH MODE" : "SINGLE MODE"}
+            </Button>
+            {batchMode && (
+              <span className="text-[10px] font-mono text-muted-foreground">
+                Select multiple files (max 50)
+              </span>
             )}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={reset}
-            disabled={status === "idle"}
-            className="border-primary/20 hover:bg-primary/5 text-primary font-bold uppercase tracking-widest h-14 rounded-sm px-6 bg-transparent"
-          >
-            <RefreshCcw size={18} />
-          </Button>
+          </div>
+          <div className="flex gap-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*,audio/*,image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+              disabled={status !== "idle"}
+              multiple={batchMode}
+            />
+            <Button
+              onClick={handleUploadClick}
+              disabled={status !== "idle" || !isAuthenticated}
+              className="flex-1 bg-primary text-primary-foreground font-black uppercase tracking-widest h-14 rounded-sm"
+            >
+              {status === "idle" ? (
+                <>
+                  <Upload className="mr-2" size={18} />
+                  {batchMode ? "Upload & Scan Batch" : "Upload & Scan Media"}
+                </>
+              ) : status === "uploading" ? (
+                <>
+                  <Upload className="mr-2 animate-pulse" size={18} />
+                  Uploading... {Math.round(uploadProgress)}%
+                </>
+              ) : status === "processing" ? (
+                <>
+                  <Play className="mr-2 animate-pulse" size={18} />
+                  {batchMode ? `Processing ${batchResults.length} files...` : `Processing... ${Math.round(scanProgress)}%`}
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2" size={18} />
+                  {batchMode ? "Batch Complete" : "Scan Complete"}
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={reset}
+              disabled={status === "idle"}
+              className="border-primary/20 hover:bg-primary/5 text-primary font-bold uppercase tracking-widest h-14 rounded-sm px-6 bg-transparent"
+            >
+              <RefreshCcw size={18} />
+            </Button>
+          </div>
+
+          {/* Batch File List */}
+          {batchMode && selectedFiles.length > 0 && (
+            <div className="bg-card/30 border border-primary/10 rounded-sm p-4 backdrop-blur-sm max-h-40 overflow-y-auto">
+              <div className="text-[10px] font-mono text-primary uppercase mb-2">SELECTED FILES ({selectedFiles.length})</div>
+              <div className="space-y-1">
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="text-[10px] font-mono text-muted-foreground truncate">
+                    {index + 1}. {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Batch Results */}
+          {batchMode && batchResults.length > 0 && (
+            <div className="bg-card/30 border border-primary/10 rounded-sm p-4 backdrop-blur-sm max-h-60 overflow-y-auto">
+              <div className="text-[10px] font-mono text-primary uppercase mb-2">BATCH RESULTS ({batchResults.length})</div>
+              <div className="space-y-2">
+                {batchResults.map((result, index) => (
+                  <div key={index} className={cn(
+                    "text-[10px] font-mono p-2 rounded border",
+                    result.scanId ? "border-success/20 bg-success/10 text-success" : "border-destructive/20 bg-destructive/10 text-destructive"
+                  )}>
+                    {result.fileName}: {result.scanId ? `Scan ID: ${result.scanId}` : `Error: ${result.error || 'Failed'}`}
+                  </div>
+                ))}
+              </div>
+              {batchId && (
+                <div className="text-[9px] font-mono text-muted-foreground mt-2 pt-2 border-t border-primary/10">
+                  Batch ID: {batchId}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

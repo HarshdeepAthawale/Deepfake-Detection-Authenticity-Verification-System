@@ -1,20 +1,20 @@
 /**
  * Detection Agent
- * Core ML inference simulation for deepfake detection
- * This uses mock logic until real ML models are integrated
+ * Core ML inference for deepfake detection
+ * Calls external ML service (Python Flask/FastAPI) when available, falls back to mock logic
  */
 
 import logger from '../utils/logger.js';
+import { callMLService, checkMLServiceHealth } from '../ml/ml-client.js';
+import { isMLServiceEnabled } from '../config/ml.config.js';
 
 /**
- * Mock deepfake detection inference
- * In production, this would call actual ML models (Python, TensorFlow, etc.)
+ * Mock deepfake detection inference (fallback when ML service unavailable)
  * @param {Object} perceptionData - Data from perception agent
  * @returns {Promise<Object>} Detection scores
  */
-export const detectDeepfake = async (perceptionData) => {
-  try {
-    logger.info(`[DETECTION_AGENT] Starting deepfake detection analysis`);
+const mockDetection = async (perceptionData) => {
+  logger.info(`[DETECTION_AGENT] Using mock detection (ML service unavailable)`);
 
     // Simulate processing time
     await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -83,9 +83,48 @@ export const detectDeepfake = async (perceptionData) => {
       confidence: Math.min(100, Math.max(50, riskScore + (hashSeed % 20) - 10)),
     };
 
-    logger.info(`[DETECTION_AGENT] Detection complete. Risk Score: ${detectionResults.riskScore}`);
+    logger.info(`[DETECTION_AGENT] Mock detection complete. Risk Score: ${detectionResults.riskScore}`);
 
     return detectionResults;
+};
+
+/**
+ * Deepfake detection inference
+ * Calls ML service if available, otherwise uses mock logic
+ * @param {Object} perceptionData - Data from perception agent
+ * @returns {Promise<Object>} Detection scores
+ */
+export const detectDeepfake = async (perceptionData) => {
+  try {
+    logger.info(`[DETECTION_AGENT] Starting deepfake detection analysis`);
+
+    // Try to use ML service if enabled
+    if (isMLServiceEnabled()) {
+      try {
+        // Check if ML service is available
+        const isHealthy = await checkMLServiceHealth();
+        
+        if (isHealthy) {
+          logger.info(`[DETECTION_AGENT] Using ML service for detection`);
+          
+          // Call ML service
+          const mlResults = await callMLService(perceptionData);
+          
+          logger.info(`[DETECTION_AGENT] ML service detection complete. Risk Score: ${mlResults.riskScore}`);
+          
+          return mlResults;
+        } else {
+          logger.warn(`[DETECTION_AGENT] ML service not healthy, falling back to mock detection`);
+        }
+      } catch (error) {
+        logger.warn(`[DETECTION_AGENT] ML service call failed, falling back to mock detection: ${error.message}`);
+      }
+    } else {
+      logger.debug(`[DETECTION_AGENT] ML service is disabled, using mock detection`);
+    }
+
+    // Fallback to mock detection
+    return await mockDetection(perceptionData);
   } catch (error) {
     logger.error(`[DETECTION_AGENT] Detection error: ${error.message}`);
     throw new Error(`Detection agent failed: ${error.message}`);

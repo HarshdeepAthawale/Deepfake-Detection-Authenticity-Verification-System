@@ -6,6 +6,8 @@
 import Scan from '../scans/scan.model.js';
 import User from '../users/user.model.js';
 import logger from '../utils/logger.js';
+import { getMLServiceStatus, checkMLServiceHealth } from '../ml/ml-client.js';
+import mlConfig from '../config/ml.config.js';
 
 /**
  * Get system-wide statistics
@@ -133,7 +135,59 @@ export const getAdminStats = async (req, res) => {
   }
 };
 
+/**
+ * Get ML service health status
+ * GET /api/admin/ml/health
+ */
+export const getMLHealth = async (req, res) => {
+  try {
+    const status = await getMLServiceStatus();
+    
+    res.status(200).json({
+      success: true,
+      data: status,
+    });
+  } catch (error) {
+    logger.error('Get ML health error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch ML service status',
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * Get ML service configuration
+ * GET /api/admin/ml/config
+ */
+export const getMLConfigEndpoint = async (req, res) => {
+  try {
+    // Don't expose sensitive information
+    const safeConfig = {
+      serviceUrl: mlConfig.serviceUrl,
+      enabled: mlConfig.enabled,
+      timeout: mlConfig.timeout,
+      retries: mlConfig.retries,
+      modelVersion: mlConfig.modelVersion,
+      confidenceThreshold: mlConfig.confidenceThreshold,
+    };
+    
+    res.status(200).json({
+      success: true,
+      data: safeConfig,
+    });
+  } catch (error) {
+    logger.error('Get ML config error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch ML configuration',
+      message: error.message,
+    });
+  }
+};
+
 export default {
   getAdminStats,
+  getMLHealth,
+  getMLConfigEndpoint,
 };
 
