@@ -98,7 +98,7 @@ def load_model(model_path=None):
         if not model_file:
             try:
                 logger.info(f'[MODEL_LOADER] Attempting to load directory as model...')
-                state_dict = torch.load(model_path, map_location=device)
+                state_dict = torch.load(model_path, map_location=device, weights_only=False)
                 if isinstance(state_dict, dict) and 'state_dict' in state_dict:
                     state_dict = state_dict['state_dict']
                 elif hasattr(state_dict, 'state_dict'):
@@ -110,7 +110,7 @@ def load_model(model_path=None):
         # Load from file if we found one
         if model_file and state_dict is None:
             logger.info(f'[MODEL_LOADER] Loading from file: {model_file}')
-            loaded_data = torch.load(model_file, map_location=device)
+            loaded_data = torch.load(model_file, map_location=device, weights_only=False)
             
             # Handle different formats
             if isinstance(loaded_data, dict):

@@ -1,7 +1,6 @@
 /**
- * Detection Agent
- * Core ML inference for deepfake detection
- * Calls external ML service (Python Flask/FastAPI) when available, falls back to mock logic
+ * Detection Agent (Enhanced)
+ * Core ML inference for deepfake detection with advanced aggregation
  */
 
 import logger from '../utils/logger.js';
@@ -9,122 +8,98 @@ import { callMLService, checkMLServiceHealth } from '../ml/ml-client.js';
 import { isMLServiceEnabled } from '../config/ml.config.js';
 
 /**
- * Mock deepfake detection inference (fallback when ML service unavailable)
- * @param {Object} perceptionData - Data from perception agent
- * @returns {Promise<Object>} Detection scores
+ * Calculate statistical aggregation of predictions
+ * @param {Array} predictions - Array of prediction objects
+ * @returns {Object} Aggregated statistics
  */
-const mockDetection = async (perceptionData) => {
-  logger.info(`[DETECTION_AGENT] Using mock detection (ML service unavailable)`);
+const aggregatePredictions = (predictions) => {
+  if (!predictions || predictions.length === 0) {
+    throw new Error('No predictions to aggregate');
+  }
 
-    // Simulate processing time
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // Deterministic + random logic for realistic results
-    const hash = perceptionData.hash || '';
-    const mediaType = perceptionData.mediaType;
-    
-    // Use hash to create deterministic but varied results
-    // Extract part of hash after 'sha256:' prefix (skip first 7 chars, take next 8)
-    const hashSubstring = hash.length >= 15 ? hash.slice(7, 15) : hash.slice(-8) || '0';
-    const hashSeed = parseInt(hashSubstring, 16) || 12345; // Fallback seed if parsing fails
-    
-    // Video-specific detection
-    let videoScore = 0;
-    let audioScore = 0;
-    
-    if (mediaType === 'VIDEO') {
-      // Simulate facial biometric analysis
-      videoScore = 30 + (hashSeed % 70); // Range: 30-100
-      
-      // Simulate audio analysis if audio was extracted
-      if (perceptionData.extractedAudio) {
-        audioScore = 20 + ((hashSeed * 3) % 80); // Range: 20-100
-      }
-    } else if (mediaType === 'AUDIO') {
-      // Audio-only analysis
-      audioScore = 25 + (hashSeed % 75); // Range: 25-100
-      videoScore = 0;
-    } else if (mediaType === 'IMAGE') {
-      // Image analysis
-      videoScore = 35 + (hashSeed % 65); // Range: 35-100
-      audioScore = 0;
-    }
-
-    // GAN fingerprint detection (simulated)
-    const ganFingerprint = 40 + ((hashSeed * 2) % 60); // Range: 40-100
-    
-    // Temporal consistency (for videos)
-    // Higher value = more consistent = lower risk (authentic)
-    // Range: 50-100 where 100 = perfectly consistent, 50 = inconsistent
-    const temporalConsistency = perceptionData.mediaType === 'VIDEO'
-      ? 50 + ((hashSeed * 5) % 50) // Range: 50-100
-      : 100; // Non-video media defaults to high consistency
-
-    // Convert to temporal inconsistency for risk calculation
-    // Higher consistency (100) = 0 inconsistency (low risk)
-    // Lower consistency (50) = 50 inconsistency (higher risk)
-    const temporalInconsistency = 100 - temporalConsistency;
-
-    // Calculate overall risk score
-    // Higher scores = higher risk (more likely to be deepfake)
-    const riskScore = Math.round(
-      (videoScore * 0.4) +
-      (audioScore * 0.3) +
-      (ganFingerprint * 0.2) +
-      (temporalInconsistency * 0.1)
-    );
-
-    const detectionResults = {
-      videoScore: Math.round(videoScore),
-      audioScore: Math.round(audioScore),
-      ganFingerprint: Math.round(ganFingerprint),
-      temporalConsistency: Math.round(temporalConsistency),
-      riskScore: Math.min(100, Math.max(0, riskScore)),
-      confidence: Math.min(100, Math.max(50, riskScore + (hashSeed % 20) - 10)),
+  // If single prediction, return it directly
+  if (predictions.length === 1) {
+    return {
+      ...predictions[0],
+      frameCount: 1,
+      variance: 0,
+      uncertainty: 0,
     };
+  }
 
-    logger.info(`[DETECTION_AGENT] Mock detection complete. Risk Score: ${detectionResults.riskScore}`);
+  // Extract scores
+  const riskScores = predictions.map(p => p.riskScore || p.risk_score || 0);
+  const confidences = predictions.map(p => p.confidence || 0);
+  const videoScores = predictions.map(p => p.videoScore || p.video_score || 0);
 
-    return detectionResults;
+  // Calculate statistics
+  const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+  const variance = arr => {
+    const m = mean(arr);
+    return arr.reduce((sum, val) => sum + Math.pow(val - m, 2), 0) / arr.length;
+  };
+  const std = arr => Math.sqrt(variance(arr));
+
+  // Weighted aggregation (higher confidence = more weight)
+  const totalConfidence = confidences.reduce((a, b) => a + b, 0);
+  const weightedRiskScore = predictions.reduce((sum, pred, idx) => {
+    const weight = confidences[idx] / totalConfidence;
+    return sum + (pred.riskScore || pred.risk_score || 0) * weight;
+  }, 0);
+
+  // Calculate uncertainty (higher variance = higher uncertainty)
+  const riskVariance = variance(riskScores);
+  const uncertainty = Math.min(100, riskVariance * 10); // Scale to 0-100
+
+  return {
+    riskScore: Math.round(weightedRiskScore),
+    confidence: Math.round(mean(confidences)),
+    videoScore: Math.round(mean(videoScores)),
+    audioScore: predictions[0].audioScore || predictions[0].audio_score || 0,
+    ganFingerprint: Math.round(mean(predictions.map(p => p.ganFingerprint || p.gan_fingerprint || 0))),
+    temporalConsistency: Math.round(mean(predictions.map(p => p.temporalConsistency || p.temporal_consistency || 100))),
+    frameCount: predictions.length,
+    variance: Math.round(riskVariance * 100) / 100,
+    uncertainty: Math.round(uncertainty),
+    modelVersion: predictions[0].modelVersion || predictions[0].model_version || 'v1',
+  };
 };
 
 /**
- * Deepfake detection inference
- * Calls ML service if available, otherwise uses mock logic
+ * Deepfake detection inference with enhanced aggregation
  * @param {Object} perceptionData - Data from perception agent
- * @returns {Promise<Object>} Detection scores
+ * @returns {Promise<Object>} Aggregated detection scores
  */
 export const detectDeepfake = async (perceptionData) => {
   try {
     logger.info(`[DETECTION_AGENT] Starting deepfake detection analysis`);
 
-    // Try to use ML service if enabled
-    if (isMLServiceEnabled()) {
-      try {
-        // Check if ML service is available
-        const isHealthy = await checkMLServiceHealth();
-        
-        if (isHealthy) {
-          logger.info(`[DETECTION_AGENT] Using ML service for detection`);
-          
-          // Call ML service
-          const mlResults = await callMLService(perceptionData);
-          
-          logger.info(`[DETECTION_AGENT] ML service detection complete. Risk Score: ${mlResults.riskScore}`);
-          
-          return mlResults;
-        } else {
-          logger.warn(`[DETECTION_AGENT] ML service not healthy, falling back to mock detection`);
-        }
-      } catch (error) {
-        logger.warn(`[DETECTION_AGENT] ML service call failed, falling back to mock detection: ${error.message}`);
-      }
-    } else {
-      logger.debug(`[DETECTION_AGENT] ML service is disabled, using mock detection`);
+    // Strictly require ML service
+    if (!isMLServiceEnabled()) {
+      throw new Error('ML service is disabled in configuration');
     }
 
-    // Fallback to mock detection
-    return await mockDetection(perceptionData);
+    // Check if ML service is available
+    const isHealthy = await checkMLServiceHealth();
+    if (!isHealthy) {
+      throw new Error('ML service is not healthy');
+    }
+
+    logger.info(`[DETECTION_AGENT] Using ML service for detection`);
+
+    // Call ML service
+    const mlResults = await callMLService(perceptionData);
+
+    // Log detailed results
+    logger.info(`[DETECTION_AGENT] ML service detection complete`);
+    logger.info(`[DETECTION_AGENT] Risk Score: ${mlResults.riskScore}, Confidence: ${mlResults.confidence}%`);
+
+    if (mlResults.frameCount && mlResults.frameCount > 1) {
+      logger.info(`[DETECTION_AGENT] Analyzed ${mlResults.frameCount} frames, Variance: ${mlResults.variance}, Uncertainty: ${mlResults.uncertainty}%`);
+    }
+
+    return mlResults;
+
   } catch (error) {
     logger.error(`[DETECTION_AGENT] Detection error: ${error.message}`);
     throw new Error(`Detection agent failed: ${error.message}`);
@@ -133,5 +108,5 @@ export const detectDeepfake = async (perceptionData) => {
 
 export default {
   detectDeepfake,
+  aggregatePredictions, // Export for testing
 };
-

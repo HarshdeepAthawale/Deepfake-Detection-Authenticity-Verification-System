@@ -132,7 +132,8 @@ export const processScan = async (scanId, filePath, userId = null) => {
     logger.info(`[SCAN_SERVICE] Pipeline complete for scan: ${scanId}. Verdict: ${finalResult.verdict}`);
 
     // Invalidate cache for this scan and related history
-    const targetUserId = userId || updatedScan.userId.toString();
+    // Use existing targetUserId
+
     await invalidate([makeKey('scan', `${scanId}:${targetUserId}`)]);
     await delPattern('scan:history:*'); // Invalidate all history caches
 
@@ -140,12 +141,12 @@ export const processScan = async (scanId, filePath, userId = null) => {
     try {
       const notificationType = finalResult.verdict === 'DEEPFAKE' ? 'deepfake_detected' : 'scan_complete';
       const priority = finalResult.verdict === 'DEEPFAKE' ? 'critical' : 'medium';
-      
+
       await createNotification({
         userId: updatedScan.userId,
         type: notificationType,
-        title: finalResult.verdict === 'DEEPFAKE' 
-          ? 'Deepfake Detected!' 
+        title: finalResult.verdict === 'DEEPFAKE'
+          ? 'Deepfake Detected!'
           : `Scan Complete: ${finalResult.verdict}`,
         message: `Scan ${scanId} has completed with verdict: ${finalResult.verdict}`,
         data: {
@@ -165,12 +166,12 @@ export const processScan = async (scanId, filePath, userId = null) => {
     // Emit completion event
     emitScanComplete(scanId, finalResult);
     if (targetUserId) {
-      emitScanUpdateToUser(targetUserId, scanId, { 
-        type: 'complete', 
-        status: 'COMPLETED', 
-        progress: 100, 
+      emitScanUpdateToUser(targetUserId, scanId, {
+        type: 'complete',
+        status: 'COMPLETED',
+        progress: 100,
         stage: 'Complete',
-        result: finalResult 
+        result: finalResult
       });
     }
 
@@ -217,12 +218,12 @@ export const processScan = async (scanId, filePath, userId = null) => {
     // Emit failure event
     emitScanFailed(scanId, error);
     if (targetUserId) {
-      emitScanUpdateToUser(targetUserId, scanId, { 
-        type: 'failed', 
-        status: 'FAILED', 
-        progress: 0, 
+      emitScanUpdateToUser(targetUserId, scanId, {
+        type: 'failed',
+        status: 'FAILED',
+        progress: 0,
         stage: 'Failed',
-        error: { message: error.message } 
+        error: { message: error.message }
       });
     }
 
@@ -240,10 +241,10 @@ export const processScan = async (scanId, filePath, userId = null) => {
 export const getScanById = async (scanId, userId, userRole = null) => {
   try {
     const cacheKey = makeKey('scan', `${scanId}:${userId}`);
-    
+
     return await cached(cacheKey, async () => {
       const query = { scanId };
-      
+
       // Access control: users can see their own scans, shared scans, or all scans if admin/analyst
       if (userRole === 'admin' || userRole === 'analyst') {
         // Admins and analysts can see all scans
@@ -254,7 +255,7 @@ export const getScanById = async (scanId, userId, userRole = null) => {
           { sharedWith: userId },
         ];
       }
-      
+
       const scan = await Scan.findOne(query);
       if (!scan) {
         throw new Error('Scan not found');
@@ -281,129 +282,129 @@ export const getScanHistory = async (filters = {}, userId, userRole, page = 1, l
     // Create cache key from filters
     const filterKey = JSON.stringify({ filters, userId, userRole, page, limit });
     const cacheKey = makeKey('scan:history', Buffer.from(filterKey).toString('base64'));
-    
+
     return await cached(cacheKey, async () => {
       const query = {};
 
-    // Role-based filtering
-    if (userRole === 'admin' || userRole === 'analyst') {
-      // Admins and analysts can see all scans
-    } else {
-      // Regular users can only see their own scans or shared scans
-      query.$or = [
-        { userId },
-        { sharedWith: userId },
-      ];
-    }
-
-    // Full-text search across fileName, explanations, operativeId
-    if (filters.search) {
-      query.$text = { $search: filters.search };
-    }
-
-    // Apply additional filters
-    if (filters.status) {
-      query.status = filters.status;
-    }
-    if (filters.mediaType) {
-      query.mediaType = filters.mediaType;
-    }
-    if (filters.verdict) {
-      query['result.verdict'] = filters.verdict;
-    }
-    
-    // Date range filtering
-    if (filters.startDate || filters.endDate) {
-      query.createdAt = {};
-      if (filters.startDate) {
-        query.createdAt.$gte = new Date(filters.startDate);
+      // Role-based filtering
+      if (userRole === 'admin' || userRole === 'analyst') {
+        // Admins and analysts can see all scans
+      } else {
+        // Regular users can only see their own scans or shared scans
+        query.$or = [
+          { userId },
+          { sharedWith: userId },
+        ];
       }
-      if (filters.endDate) {
-        query.createdAt.$lte = new Date(filters.endDate);
+
+      // Full-text search across fileName, explanations, operativeId
+      if (filters.search) {
+        query.$text = { $search: filters.search };
       }
-    }
 
-    // GPS location filtering (within radius)
-    if (filters.latitude && filters.longitude && filters.radius) {
-      // MongoDB geospatial query for location-based filtering
-      // Note: This is a simplified implementation - in production, use proper geospatial indexing
-      query.gpsCoordinates = {
-        $exists: true,
-        $ne: null,
-      };
-      // For exact implementation, you'd use $geoWithin with $centerSphere
-      // This requires a 2dsphere index on gpsCoordinates
-    }
-
-    // Tag filtering
-    if (filters.tags && Array.isArray(filters.tags) && filters.tags.length > 0) {
-      query.tags = { $in: filters.tags };
-    }
-
-    // User/operative filtering (for admins)
-    if (userRole === 'admin' && filters.operativeId) {
-      query.operativeId = filters.operativeId;
-    }
-
-    // Confidence score filtering
-    if (filters.minConfidence !== undefined || filters.maxConfidence !== undefined) {
-      query['result.confidence'] = {};
-      if (filters.minConfidence !== undefined) {
-        query['result.confidence'].$gte = parseFloat(filters.minConfidence);
+      // Apply additional filters
+      if (filters.status) {
+        query.status = filters.status;
       }
-      if (filters.maxConfidence !== undefined) {
-        query['result.confidence'].$lte = parseFloat(filters.maxConfidence);
+      if (filters.mediaType) {
+        query.mediaType = filters.mediaType;
       }
-    }
-
-    // Risk score filtering
-    if (filters.minRiskScore !== undefined || filters.maxRiskScore !== undefined) {
-      query['result.riskScore'] = {};
-      if (filters.minRiskScore !== undefined) {
-        query['result.riskScore'].$gte = parseFloat(filters.minRiskScore);
+      if (filters.verdict) {
+        query['result.verdict'] = filters.verdict;
       }
-      if (filters.maxRiskScore !== undefined) {
-        query['result.riskScore'].$lte = parseFloat(filters.maxRiskScore);
+
+      // Date range filtering
+      if (filters.startDate || filters.endDate) {
+        query.createdAt = {};
+        if (filters.startDate) {
+          query.createdAt.$gte = new Date(filters.startDate);
+        }
+        if (filters.endDate) {
+          query.createdAt.$lte = new Date(filters.endDate);
+        }
       }
-    }
 
-    const skip = (page - 1) * limit;
-
-    // Build sort options
-    let sortOptions = { createdAt: -1 }; // Default sort by newest first
-    if (filters.sortBy) {
-      const sortDirection = filters.sortOrder === 'asc' ? 1 : -1;
-      switch (filters.sortBy) {
-        case 'date':
-          sortOptions = { createdAt: sortDirection };
-          break;
-        case 'confidence':
-          sortOptions = { 'result.confidence': sortDirection };
-          break;
-        case 'riskScore':
-          sortOptions = { 'result.riskScore': sortDirection };
-          break;
-        case 'fileName':
-          sortOptions = { fileName: sortDirection };
-          break;
-        default:
-          sortOptions = { createdAt: -1 };
+      // GPS location filtering (within radius)
+      if (filters.latitude && filters.longitude && filters.radius) {
+        // MongoDB geospatial query for location-based filtering
+        // Note: This is a simplified implementation - in production, use proper geospatial indexing
+        query.gpsCoordinates = {
+          $exists: true,
+          $ne: null,
+        };
+        // For exact implementation, you'd use $geoWithin with $centerSphere
+        // This requires a 2dsphere index on gpsCoordinates
       }
-    }
 
-    // If text search is used, add text score to sort (higher relevance first)
-    if (filters.search) {
-      sortOptions = { score: { $meta: 'textScore' }, ...sortOptions };
-    }
+      // Tag filtering
+      if (filters.tags && Array.isArray(filters.tags) && filters.tags.length > 0) {
+        query.tags = { $in: filters.tags };
+      }
 
-    const [scans, total] = await Promise.all([
-      Scan.find(query, filters.search ? { score: { $meta: 'textScore' } } : {})
-        .sort(sortOptions)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Scan.countDocuments(query),
-    ]);
+      // User/operative filtering (for admins)
+      if (userRole === 'admin' && filters.operativeId) {
+        query.operativeId = filters.operativeId;
+      }
+
+      // Confidence score filtering
+      if (filters.minConfidence !== undefined || filters.maxConfidence !== undefined) {
+        query['result.confidence'] = {};
+        if (filters.minConfidence !== undefined) {
+          query['result.confidence'].$gte = parseFloat(filters.minConfidence);
+        }
+        if (filters.maxConfidence !== undefined) {
+          query['result.confidence'].$lte = parseFloat(filters.maxConfidence);
+        }
+      }
+
+      // Risk score filtering
+      if (filters.minRiskScore !== undefined || filters.maxRiskScore !== undefined) {
+        query['result.riskScore'] = {};
+        if (filters.minRiskScore !== undefined) {
+          query['result.riskScore'].$gte = parseFloat(filters.minRiskScore);
+        }
+        if (filters.maxRiskScore !== undefined) {
+          query['result.riskScore'].$lte = parseFloat(filters.maxRiskScore);
+        }
+      }
+
+      const skip = (page - 1) * limit;
+
+      // Build sort options
+      let sortOptions = { createdAt: -1 }; // Default sort by newest first
+      if (filters.sortBy) {
+        const sortDirection = filters.sortOrder === 'asc' ? 1 : -1;
+        switch (filters.sortBy) {
+          case 'date':
+            sortOptions = { createdAt: sortDirection };
+            break;
+          case 'confidence':
+            sortOptions = { 'result.confidence': sortDirection };
+            break;
+          case 'riskScore':
+            sortOptions = { 'result.riskScore': sortDirection };
+            break;
+          case 'fileName':
+            sortOptions = { fileName: sortDirection };
+            break;
+          default:
+            sortOptions = { createdAt: -1 };
+        }
+      }
+
+      // If text search is used, add text score to sort (higher relevance first)
+      if (filters.search) {
+        sortOptions = { score: { $meta: 'textScore' }, ...sortOptions };
+      }
+
+      const [scans, total] = await Promise.all([
+        Scan.find(query, filters.search ? { score: { $meta: 'textScore' } } : {})
+          .sort(sortOptions)
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        Scan.countDocuments(query),
+      ]);
 
       return {
         scans,
@@ -432,7 +433,7 @@ export const getScanHistory = async (filters = {}, userId, userRole, page = 1, l
 export const updateScanTags = async (scanId, tags, userId, userRole) => {
   try {
     const query = { scanId };
-    
+
     // Non-admins can only update their own scans
     if (userRole !== 'admin') {
       query.userId = userId;
@@ -457,11 +458,11 @@ export const updateScanTags = async (scanId, tags, userId, userRole) => {
     }
 
     logger.info(`Scan tags updated: ${scanId}, tags: ${cleanTags.join(', ')}`);
-    
+
     // Invalidate cache
     await invalidate([makeKey('scan', `${scanId}:${userId}`)]);
     await delPattern('scan:history:*');
-    
+
     return scan.toObject();
   } catch (error) {
     logger.error('Update scan tags error:', error);
@@ -479,7 +480,7 @@ export const updateScanTags = async (scanId, tags, userId, userRole) => {
 export const deleteScan = async (scanId, userId, userRole) => {
   try {
     const query = { scanId };
-    
+
     // Non-admins can only delete their own scans
     if (userRole !== 'admin') {
       query.userId = userId;
@@ -529,7 +530,7 @@ export const processBatchUpload = async (files, userId, operativeId, batchId = n
     for (const file of files) {
       try {
         const scanId = generateScanId();
-        
+
         // Generate file hash
         const fileBuffer = fs.readFileSync(file.path);
         const fileHash = generateFileHash(fileBuffer);
@@ -615,7 +616,7 @@ export const processBatchUpload = async (files, userId, operativeId, batchId = n
 export const shareScan = async (scanId, userIds, userId, userRole) => {
   try {
     const query = { scanId };
-    
+
     // Non-admins can only share their own scans
     if (userRole !== 'admin') {
       query.userId = userId;
@@ -651,7 +652,7 @@ export const shareScan = async (scanId, userIds, userId, userRole) => {
 export const addComment = async (scanId, text, userId, operativeId, userRole) => {
   try {
     const query = { scanId };
-    
+
     // Check if user has access to scan
     if (userRole !== 'admin') {
       query.$or = [
@@ -698,7 +699,7 @@ export const assignScan = async (scanId, assignToUserId, userId, userRole) => {
     }
 
     const query = { scanId };
-    
+
     // Non-admins can only assign scans they have access to
     if (userRole !== 'admin') {
       query.$or = [

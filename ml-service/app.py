@@ -38,60 +38,27 @@ logger = logging.getLogger(__name__)
 # Global model instance (loaded on startup)
 _model = None
 _model_loaded = False
-_use_mock_fallback = False
 
 
 def load_model_on_startup():
     """Load model when service starts"""
-    global _model, _model_loaded, _use_mock_fallback
+    global _model, _model_loaded
     
     try:
         model_path = os.environ.get('MODEL_PATH', None)
         logger.info('[ML_SERVICE] Loading model on startup...')
         _model = get_model(model_path)
         _model_loaded = True
-        _use_mock_fallback = False
         logger.info('[ML_SERVICE] Model loaded successfully')
     except Exception as e:
         logger.error(f'[ML_SERVICE] Failed to load model: {str(e)}', exc_info=True)
-        logger.warning('[ML_SERVICE] Falling back to mock inference')
+        # No fallback - service is unhealthy if model fails to load
         _model_loaded = False
-        _use_mock_fallback = True
+        # Do not raise here to allow service to start and report unhealthy status
 
 
-def mock_inference(hash_value, media_type, model_version):
-    """
-    Mock inference fallback when model is not available
-    Returns deterministic scores based on hash
-    """
-    import random
-    
-    start_time = time.time()
-    time.sleep(0.5)  # Simulate processing time
-    
-    # Generate mock scores (deterministic based on hash for testing)
-    hash_seed = int(hash_value[7:15], 16) if len(hash_value) >= 15 else random.randint(0, 10000)
-    
-    video_score = 30 + (hash_seed % 70) if media_type in ['VIDEO', 'IMAGE'] else 0
-    audio_score = 20 + ((hash_seed * 3) % 80) if media_type in ['VIDEO', 'AUDIO'] else 0
-    gan_fingerprint = 40 + ((hash_seed * 2) % 60)
-    temporal_consistency = 50 + ((hash_seed * 5) % 50) if media_type == 'VIDEO' else 100
-    
-    risk_score = int((video_score * 0.4) + (audio_score * 0.3) + (gan_fingerprint * 0.2) + ((100 - temporal_consistency) * 0.1))
-    confidence = min(100, max(50, risk_score + (hash_seed % 20) - 10))
-    
-    inference_time = int((time.time() - start_time) * 1000)
-    
-    return {
-        'video_score': video_score,
-        'audio_score': audio_score,
-        'gan_fingerprint': gan_fingerprint,
-        'temporal_consistency': temporal_consistency,
-        'risk_score': min(100, max(0, risk_score)),
-        'confidence': confidence,
-        'model_version': model_version,
-        'inference_time': inference_time
-    }
+
+
 
 
 def run_model_inference(model, images_tensor, device):
@@ -139,6 +106,11 @@ def calculate_scores(predictions, media_type, frame_count=1):
         # Extract fake probabilities (class 1)
         fake_probs = predictions[:, 1]  # Shape: [batch_size]
         
+        # DEBUG: Log actual predictions
+        logger.info(f'[ML_SERVICE] Raw predictions shape: {predictions.shape}')
+        logger.info(f'[ML_SERVICE] Sample predictions (first 3): {predictions[:min(3, len(predictions))]}')
+        logger.info(f'[ML_SERVICE] Fake probabilities: {fake_probs}')
+        
         # Calculate video score (probability of fake, scaled to 0-100)
         video_score = float(np.mean(fake_probs) * 100)
         
@@ -166,6 +138,8 @@ def calculate_scores(predictions, media_type, frame_count=1):
         risk_score = video_score * 0.5 + gan_fingerprint * 0.3 + (100 - temporal_consistency) * 0.2
         risk_score = min(100, max(0, risk_score))
         
+        logger.info(f'[ML_SERVICE] Calculated scores: video={video_score}, risk={risk_score}, confidence={confidence}')
+        
         return {
             'video_score': round(video_score, 2),
             'audio_score': round(audio_score, 2),
@@ -185,41 +159,19 @@ def health_check():
     """Health check endpoint"""
     model_status = 'loaded' if _model_loaded else 'not_loaded'
     return jsonify({
-        'status': 'healthy',
+        'status': 'healthy' if _model_loaded else 'unhealthy',
         'service': 'deepfake-detection-ml-service',
         'version': '1.0.0',
         'model_status': model_status,
-        'using_fallback': _use_mock_fallback,
+        'using_fallback': False,
         'timestamp': datetime.utcnow().isoformat()
-    }), 200
+    }), 200 if _model_loaded else 503
 
 
 @app.route('/api/v1/inference', methods=['POST'])
 def inference():
     """
     Deepfake detection inference endpoint
-    
-    Request body:
-    {
-        "hash": "sha256:...",
-        "mediaType": "VIDEO|AUDIO|IMAGE",
-        "metadata": {...},
-        "extractedFrames": [...],
-        "extractedAudio": "...",
-        "modelVersion": "v1"
-    }
-    
-    Response:
-    {
-        "video_score": 0-100,
-        "audio_score": 0-100,
-        "gan_fingerprint": 0-100,
-        "temporal_consistency": 0-100,
-        "risk_score": 0-100,
-        "confidence": 0-100,
-        "model_version": "v1",
-        "inference_time": 1234
-    }
     """
     start_time = time.time()
     
@@ -231,6 +183,12 @@ def inference():
                 'error': 'Invalid request',
                 'message': 'Request body must be JSON'
             }), 400
+            
+        if not _model_loaded:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'Model is not loaded'
+            }), 503
         
         hash_value = data.get('hash', '')
         media_type = data.get('mediaType', 'UNKNOWN')
@@ -240,12 +198,6 @@ def inference():
         
         logger.info(f'[ML_SERVICE] Inference request: hash={hash_value[:16]}..., type={media_type}, model={model_version}')
         
-        # Use mock inference if model not loaded
-        if not _model_loaded or _use_mock_fallback:
-            logger.warning('[ML_SERVICE] Using mock inference (model not available)')
-            response = mock_inference(hash_value, media_type, model_version)
-            return jsonify(response), 200
-        
         # Get device
         device = get_device()
         
@@ -253,68 +205,36 @@ def inference():
         if media_type == 'IMAGE':
             # Single image processing
             if not extracted_frames:
-                # Try to use the image path from metadata or hash
-                logger.warning('[ML_SERVICE] No frame paths provided for IMAGE, using mock inference')
-                response = mock_inference(hash_value, media_type, model_version)
-                response['inference_time'] = int((time.time() - start_time) * 1000)
-                return jsonify(response), 200
+                raise ValueError('No frame paths provided for IMAGE')
             
             # Process first frame as image
             image_path = extracted_frames[0] if isinstance(extracted_frames, list) else extracted_frames
-            try:
-                image_tensor = preprocess_image(image_path)
-                predictions = run_model_inference(_model, image_tensor, device)
-                scores = calculate_scores(predictions, media_type, frame_count=1)
-            except Exception as e:
-                logger.error(f'[ML_SERVICE] Image processing error: {str(e)}', exc_info=True)
-                logger.warning('[ML_SERVICE] Falling back to mock inference')
-                response = mock_inference(hash_value, media_type, model_version)
-                response['inference_time'] = int((time.time() - start_time) * 1000)
-                return jsonify(response), 200
+            image_tensor = preprocess_image(image_path)
+            predictions = run_model_inference(_model, image_tensor, device)
+            scores = calculate_scores(predictions, media_type, frame_count=1)
         
         elif media_type == 'VIDEO':
             # Video frame processing
             if not extracted_frames:
-                logger.warning('[ML_SERVICE] No frame paths provided for VIDEO, using mock inference')
-                response = mock_inference(hash_value, media_type, model_version)
-                response['inference_time'] = int((time.time() - start_time) * 1000)
-                return jsonify(response), 200
+                raise ValueError('No frame paths provided for VIDEO')
             
             # Process frames (limit to max 30 frames for performance)
             max_frames = 30
-            try:
-                frames_tensor, valid_frames = preprocess_frames(extracted_frames, max_frames=max_frames)
-                
-                if frames_tensor is None or len(valid_frames) == 0:
-                    logger.warning('[ML_SERVICE] No valid frames processed, using mock inference')
-                    response = mock_inference(hash_value, media_type, model_version)
-                    response['inference_time'] = int((time.time() - start_time) * 1000)
-                    return jsonify(response), 200
-                
-                # Run inference on frames
-                predictions = run_model_inference(_model, frames_tensor, device)
-                scores = calculate_scores(predictions, media_type, frame_count=len(valid_frames))
-                
-            except Exception as e:
-                logger.error(f'[ML_SERVICE] Video processing error: {str(e)}', exc_info=True)
-                logger.warning('[ML_SERVICE] Falling back to mock inference')
-                response = mock_inference(hash_value, media_type, model_version)
-                response['inference_time'] = int((time.time() - start_time) * 1000)
-                return jsonify(response), 200
+            frames_tensor, valid_frames = preprocess_frames(extracted_frames, max_frames=max_frames)
+            
+            if frames_tensor is None or len(valid_frames) == 0:
+                raise ValueError('No valid frames processed')
+            
+            # Run inference on frames
+            predictions = run_model_inference(_model, frames_tensor, device)
+            scores = calculate_scores(predictions, media_type, frame_count=len(valid_frames))
         
         elif media_type == 'AUDIO':
-            # Audio processing - model is image-based, so use mock
-            logger.info('[ML_SERVICE] Audio type detected, model is image-based, using mock inference')
-            response = mock_inference(hash_value, media_type, model_version)
-            response['inference_time'] = int((time.time() - start_time) * 1000)
-            return jsonify(response), 200
+            # Audio processing not supported by current image model
+            raise NotImplementedError('Audio-only inference not supported by EfficientNet model')
         
         else:
-            # Unknown media type
-            logger.warning(f'[ML_SERVICE] Unknown media type: {media_type}, using mock inference')
-            response = mock_inference(hash_value, media_type, model_version)
-            response['inference_time'] = int((time.time() - start_time) * 1000)
-            return jsonify(response), 200
+            raise ValueError(f'Unknown media type: {media_type}')
         
         # Calculate inference time
         inference_time = int((time.time() - start_time) * 1000)
@@ -332,20 +252,10 @@ def inference():
         
     except Exception as e:
         logger.error(f'[ML_SERVICE] Inference error: {str(e)}', exc_info=True)
-        
-        # Try to return mock response as fallback
-        try:
-            hash_value = request.get_json().get('hash', '') if request.get_json() else ''
-            media_type = request.get_json().get('mediaType', 'UNKNOWN') if request.get_json() else 'UNKNOWN'
-            model_version = request.get_json().get('modelVersion', 'v1') if request.get_json() else 'v1'
-            response = mock_inference(hash_value, media_type, model_version)
-            response['inference_time'] = int((time.time() - start_time) * 1000)
-            return jsonify(response), 200
-        except:
-            return jsonify({
-                'error': 'Inference failed',
-                'message': str(e)
-            }), 500
+        return jsonify({
+            'error': 'Inference failed',
+            'message': str(e)
+        }), 500
 
 
 @app.errorhandler(404)
@@ -373,7 +283,7 @@ if __name__ == '__main__':
     load_model_on_startup()
     
     logger.info(f'[ML_SERVICE] Starting ML service on port {port}')
-    logger.info(f'[ML_SERVICE] Model loaded: {_model_loaded}, Fallback mode: {_use_mock_fallback}')
+    logger.info(f'[ML_SERVICE] Model loaded: {_model_loaded}')
     
     app.run(host='0.0.0.0', port=port, debug=False)
 else:

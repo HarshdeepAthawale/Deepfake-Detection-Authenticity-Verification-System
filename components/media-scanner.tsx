@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils"
 import { apiService, type ScanResult } from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
 import { initializeSocket, subscribeToScan, unsubscribeFromScan, getSocket, disconnectSocket } from "@/lib/socket"
-import { useEffect, useRef } from "react"
+
 
 export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanResult | null) => void }) {
   const { isAuthenticated, user, token } = useAuth()

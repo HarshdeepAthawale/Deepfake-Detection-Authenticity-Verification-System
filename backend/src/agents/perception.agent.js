@@ -43,10 +43,16 @@ export const processMedia = async (filePath, scanId) => {
     }
 
     // Determine media type
-    const mimeType = metadata.format?.format_name || path.extname(filePath);
-    const isVideo = ['mp4', 'avi', 'mov', 'webm', 'mkv'].some(ext => mimeType.includes(ext));
-    const isAudio = ['mp3', 'wav', 'mpeg', 'aac'].some(ext => mimeType.includes(ext));
-    const isImage = ['jpg', 'jpeg', 'png', 'gif'].some(ext => mimeType.includes(ext));
+    // Determine media type
+    const ext = path.extname(filePath).toLowerCase();
+    const formatName = metadata.format?.format_name?.toLowerCase() || '';
+
+    // Robust type detection
+    const isVideo = ['mp4', 'avi', 'mov', 'webm', 'mkv'].some(t => formatName.includes(t) || ext.includes(t));
+    const isAudio = ['mp3', 'wav', 'mpeg', 'aac'].some(t => formatName.includes(t) || ext.includes(t));
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'tiff', 'image2'].some(t => formatName.includes(t) || ext.includes(t));
+
+    logger.info(`[PERCEPTION_AGENT] Determined media type: Video=${isVideo}, Audio=${isAudio}, Image=${isImage} (Format: ${formatName}, Ext: ${ext})`);
 
     // Create processing directory
     const processingDir = path.join(__dirname, '../../uploads/processing', scanId);
@@ -97,6 +103,9 @@ export const processMedia = async (filePath, scanId) => {
       } catch (error) {
         logger.warn(`[PERCEPTION_AGENT] Frame extraction failed: ${error.message}`);
       }
+    } else if (isImage) {
+      // For images, the "frame" is just the image file itself
+      perceptionResults.extractedFrames = [filePath];
     }
 
     // Extract audio if video

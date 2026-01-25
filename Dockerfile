@@ -1,5 +1,5 @@
 # Frontend Dockerfile for Deepfake Detection System
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -11,11 +11,11 @@ COPY package.json package-lock.json* pnpm-lock.yaml* ./
 # Install dependencies based on the preferred package manager
 RUN \
   if [ -f pnpm-lock.yaml ]; then \
-    corepack enable pnpm && pnpm i --frozen-lockfile; \
+  corepack enable pnpm && pnpm i --frozen-lockfile; \
   elif [ -f package-lock.json ]; then \
-    npm ci; \
+  npm ci; \
   else \
-    echo "Lockfile not found." && exit 1; \
+  echo "Lockfile not found." && exit 1; \
   fi
 
 # Rebuild the source code only when needed
@@ -27,6 +27,8 @@ COPY . .
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV NODE_ENV production
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
 # Build Next.js application
 RUN npm run build
