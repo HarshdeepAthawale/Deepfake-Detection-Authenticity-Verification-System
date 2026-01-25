@@ -1,0 +1,19 @@
+# Flask web framework
+flask>=2.3.0
+flask-cors>=4.0.0
+
+# PyTorch and torchvision for model inference
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Image processing
+Pillow>=10.0.0
+
+# Scientific computing
+numpy>=1.24.0
+
+# Media processing (for potential future use)
+opencv-python>=4.8.0
+
+# Utilities
+requests>=2.31.0
