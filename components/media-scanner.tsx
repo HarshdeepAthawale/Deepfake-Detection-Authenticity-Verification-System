@@ -86,7 +86,7 @@ export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanRes
       // Create preview URL for the file
       const previewUrl = URL.createObjectURL(file)
       setMediaPreview(previewUrl)
-      
+
       // Determine media type
       if (file.type.startsWith('image/')) {
         setMediaType('image')
@@ -127,10 +127,10 @@ export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanRes
       setBatchId(batchResponse.data.batchId)
       setStatus("processing")
       setUploadProgress(100)
-      
+
       // Set batch results
       setBatchResults(batchResponse.data.scans || [])
-      
+
       // Note: Individual scan progress will be updated via WebSocket
       // For now, we'll show batch status
       setTimeout(() => {
@@ -216,7 +216,7 @@ export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanRes
           } else if (data.type === 'complete') {
             completed = true
             if (timeoutId) clearTimeout(timeoutId)
-            
+
             // Fetch full scan result from API
             apiService.getScan(scanId).then((response) => {
               if (response.success && response.data) {
@@ -300,11 +300,11 @@ export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanRes
     }
   }
 
-  const overallProgress = status === "uploading" 
-    ? uploadProgress * 0.3 
+  const overallProgress = status === "uploading"
+    ? uploadProgress * 0.3
     : status === "processing"
-    ? 30 + (scanProgress * 0.7)
-    : 0
+      ? 30 + (scanProgress * 0.7)
+      : 0
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
@@ -319,17 +319,17 @@ export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanRes
 
           {/* Media Display */}
           {mediaPreview && mediaType === "image" && (
-            <img 
-              src={mediaPreview} 
-              alt="Media preview" 
+            <img
+              src={mediaPreview}
+              alt="Media preview"
               className="w-full h-full object-contain"
             />
           )}
-          
+
           {mediaPreview && mediaType === "video" && (
-            <video 
+            <video
               ref={videoRef}
-              src={mediaPreview} 
+              src={mediaPreview}
               className="w-full h-full object-contain"
               controls
               autoPlay
@@ -380,10 +380,15 @@ export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanRes
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <div className="text-[10px] font-mono text-primary uppercase">Agent_Confidence</div>
-                <div className="text-[10px] font-mono text-white">{Math.round(overallProgress)}%</div>
+                <div className="text-[10px] font-mono text-white">
+                  {result ? `${result.confidence}%` : status !== "idle" ? `${Math.round(overallProgress)}%` : '0%'}
+                </div>
               </div>
               <div className="w-48 h-1 bg-primary/10 rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${overallProgress}%` }} />
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${result ? result.confidence : overallProgress}%` }}
+                />
               </div>
             </div>
 

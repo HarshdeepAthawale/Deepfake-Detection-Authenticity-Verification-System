@@ -87,7 +87,7 @@ services:
   # Frontend Next.js Application
   frontend:
     build:
-      context: ./frontend
+      context: .
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}

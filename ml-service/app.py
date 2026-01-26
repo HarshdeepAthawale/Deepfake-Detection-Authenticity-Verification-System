@@ -154,6 +154,7 @@ def calculate_scores(predictions, media_type, frame_count=1):
         raise
 
 
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""

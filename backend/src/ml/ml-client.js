@@ -37,13 +37,13 @@ export const checkMLServiceHealth = async () => {
     if (response.ok) {
       const data = await response.json();
       mlServiceHealthy = data.status === 'healthy' || data.status === 'ok';
-      
+
       if (mlServiceHealthy) {
         logger.debug('[ML_CLIENT] ML service is healthy');
       } else {
         logger.warn('[ML_CLIENT] ML service health check returned unhealthy status');
       }
-      
+
       return mlServiceHealthy;
     } else {
       mlServiceHealthy = false;
@@ -173,7 +173,7 @@ export const callMLService = async (perceptionData) => {
       };
     } catch (error) {
       lastError = error;
-      
+
       if (error.name === 'AbortError') {
         logger.warn(`[ML_CLIENT] ML service request timed out (attempt ${attempt}/${mlConfig.retries})`);
       } else {
@@ -198,7 +198,7 @@ export const callMLService = async (perceptionData) => {
  */
 export const getMLServiceStatus = async () => {
   const isHealthy = await checkMLServiceHealth();
-  
+
   return {
     enabled: isMLServiceEnabled(),
     healthy: isHealthy,
