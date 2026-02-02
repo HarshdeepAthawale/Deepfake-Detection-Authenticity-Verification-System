@@ -99,7 +99,7 @@ services:
     ports:
       - "5001:5000"
     environment:
-      MODEL_PATH: /app/efficientnet_b0_ffpp_c23
+      PORT: 5000
     volumes:
       - uploads:/app/uploads
     networks:

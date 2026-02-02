@@ -161,18 +161,39 @@ export const callMLService = async (perceptionData) => {
       logger.info(`[ML_CLIENT] ML inference completed successfully for hash: ${perceptionData.hash.slice(0, 16)}...`);
 
       // Transform ML service response to match expected format
-      return {
+      const transformedResult = {
         videoScore: result.video_score || result.videoScore || 0,
         audioScore: result.audio_score || result.audioScore || 0,
         ganFingerprint: result.gan_fingerprint || result.ganFingerprint || 0,
         temporalConsistency: result.temporal_consistency || result.temporalConsistency || 0,
-        peakRisk: result.peak_risk || result.peakRisk || 0, // NEW
-        meanRisk: result.mean_risk || result.meanRisk || 0, // NEW
+        peakRisk: result.peak_risk || result.peakRisk || 0,
+        meanRisk: result.mean_risk || result.meanRisk || 0,
         riskScore: result.risk_score || result.riskScore || 0,
         confidence: result.confidence || 0,
         modelVersion: result.model_version || mlConfig.modelVersion,
         inferenceTime: result.inference_time || 0,
+        // New fields from ML Service v4.0.0
+        facesDetected: result.faces_detected || 0,
+        totalFrames: result.total_frames || 0,
+        warning: result.warning || null,
       };
+
+      // Log diagnostic info if available
+      if (transformedResult.facesDetected !== undefined && transformedResult.totalFrames > 0) {
+        const faceDetectionRate = ((transformedResult.facesDetected / transformedResult.totalFrames) * 100).toFixed(1);
+        logger.info(`[ML_CLIENT] Face detection: ${transformedResult.facesDetected}/${transformedResult.totalFrames} frames (${faceDetectionRate}%)`);
+
+        // Warn if low face detection rate
+        if (transformedResult.facesDetected < transformedResult.totalFrames * 0.5) {
+          logger.warn(`[ML_CLIENT] Low face detection rate: ${faceDetectionRate}% - results may be less accurate`);
+        }
+      }
+
+      if (transformedResult.warning) {
+        logger.warn(`[ML_CLIENT] ML service warning: ${transformedResult.warning}`);
+      }
+
+      return transformedResult;
     } catch (error) {
       lastError = error;
 

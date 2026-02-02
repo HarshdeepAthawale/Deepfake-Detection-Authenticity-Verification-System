@@ -32,3 +32,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+*.egg-info/
+
+# ML models (too large for GitHub)
+deepfake-detector-model-v1/
+ml-service/model/
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.h5

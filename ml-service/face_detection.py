@@ -92,11 +92,12 @@ def get_face_detector():
         return None
 
 
-def _detect_face_dnn(image_rgb, net, confidence_threshold=0.3):
+def _detect_face_dnn(image_rgb, net, confidence_threshold=0.15):
     """Detect faces using OpenCV DNN detector
 
-    Note: Lower confidence threshold (0.3) to catch more faces at the cost of potential false positives.
+    Note: Very low confidence threshold (0.15) to catch more faces including small/distant ones.
     This is important because the deepfake model REQUIRES face crops to work correctly.
+    False positives are acceptable - incorrect face detection is better than no detection.
     """
     h, w = image_rgb.shape[:2]
 

@@ -589,14 +589,6 @@ export function MediaScanner({ onScanResult }: { onScanResult?: (result: ScanRes
                 )}
               </div>
             )}
-            {status === "processing" && !result && (
-              <div className="space-y-4">
-                <AnalysisMetric label="FACIAL_BIOMETRICS" value={scanProgress > 60 ? 50 : scanProgress * 0.8} />
-                <AnalysisMetric label="AUDIO_PHONETIC_MATCH" value={scanProgress > 40 ? 30 : scanProgress * 0.7} />
-                <AnalysisMetric label="GAN_FINGERPRINT" value={scanProgress > 80 ? 60 : 0} />
-                <AnalysisMetric label="TEMPORAL_CONSISTENCY" value={scanProgress > 50 ? 40 : 0} />
-              </div>
-            )}
           </div>
 
           <div className="mt-6 pt-4 border-t border-primary/10">

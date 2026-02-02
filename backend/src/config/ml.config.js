@@ -17,7 +17,7 @@ const mlConfig = {
   retryDelay: parseInt(process.env.ML_SERVICE_RETRY_DELAY || '1000', 10), // 1 second
 
   // Model Configuration
-  modelVersion: process.env.ML_MODEL_VERSION || 'v1',
+  modelVersion: process.env.ML_MODEL_VERSION || 'v4',
   confidenceThreshold: parseFloat(process.env.ML_CONFIDENCE_THRESHOLD || '0.5'), // 0.5 = 50%
 
   // Health Check

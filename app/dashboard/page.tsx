@@ -116,16 +116,6 @@ export default function DashboardPage() {
 
           {/* Sidebar Widgets */}
           <div className="space-y-6">
-            <div className="bg-card/30 border border-primary/10 rounded-sm p-4 backdrop-blur-sm">
-              <h2 className="text-sm font-bold text-primary mb-4 border-b border-primary/10 pb-2">SYSTEM_HEALTH</h2>
-              <div className="space-y-4">
-                <HealthMetric label="AGENT_CORE" value={92} />
-                <HealthMetric label="DATABASE_SYNC" value={100} />
-                <HealthMetric label="AI_MODEL_V4" value={88} />
-                <HealthMetric label="ENCRYPTION_ENGINE" value={100} />
-              </div>
-            </div>
-
             <div className="bg-primary/5 border border-primary/20 rounded-sm p-6 text-center space-y-4">
               <Zap className="w-8 h-8 text-primary mx-auto animate-pulse" />
               <div className="space-y-1">
@@ -219,19 +209,3 @@ function LogItem({
   )
 }
 
-function HealthMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-[10px] font-mono">
-        <span className="text-muted-foreground uppercase">{label}</span>
-        <span className={cn(value > 90 ? "text-success" : "text-warning")}>{value}%</span>
-      </div>
-      <div className="h-1 bg-primary/5 rounded-full overflow-hidden">
-        <div
-          className={cn("h-full transition-all duration-1000", value > 90 ? "bg-success/60" : "bg-warning/60")}
-          style={{ width: `${value}%` }}
-        />
-      </div>
-    </div>
-  )
-}

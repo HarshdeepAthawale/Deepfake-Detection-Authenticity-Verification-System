@@ -1,16 +1,20 @@
 # ML Service - Deepfake Detection API
 
-Python Flask service for deepfake detection using the Hugging Face Deepfake-Detect-Siglip2 model.
+Python Flask service for deepfake detection using the high-accuracy deepfake-detector-model-v1.
 
 ## Overview
 
-This ML service provides inference endpoints for the deepfake detection system. It uses the **prithivMLmods/Deepfake-Detect-Siglip2** model from Hugging Face, which is based on SigLIP (Sigmoid Language-Image Pre-training) architecture optimized for deepfake detection.
+This ML service provides inference endpoints for the deepfake detection system. It uses the **prithivMLmods/deepfake-detector-model-v1** model from Hugging Face, which is based on SigLIP (Sigmoid Language-Image Pre-training) architecture optimized for deepfake and AI-generated image detection.
 
 ## Model Details
 
-- **Model**: [prithivMLmods/Deepfake-Detect-Siglip2](https://huggingface.co/prithivMLmods/Deepfake-Detect-Siglip2)
-- **Architecture**: SigLIP-based image classification
-- **Output**: Fake/Real classification with confidence scores
+- **Model**: [prithivMLmods/deepfake-detector-model-v1](https://huggingface.co/prithivMLmods/deepfake-detector-model-v1)
+- **Architecture**: SigLIP-based binary image classification
+- **Accuracy**: 94.44%
+- **Performance**:
+  - Fake precision: 0.9718 | Recall: 0.9155
+  - Real precision: 0.9201 | Recall: 0.9734
+- **Output**: Binary classification (Fake/Real) with confidence scores
 - **Framework**: Hugging Face Transformers
 
 ## Installation
@@ -32,8 +36,7 @@ pip install -r requirements.txt
 - **Flask** (>=2.3.0) - Web framework
 - **Pillow** (>=10.0.0) - Image processing
 - **NumPy** (>=1.24.0) - Numerical computing
-- **OpenCV** (>=4.8.0) - Media processing
-- **mediapipe** (>=0.10.0) - Face detection
+- **OpenCV** (>=4.8.0) - Media processing and face detection
 
 ## Running the Service
 
@@ -65,9 +68,12 @@ Returns service health status and model loading state:
 {
   "status": "healthy",
   "service": "deepfake-detection-ml-service",
-  "version": "2.0.0",
-  "model": "prithivMLmods/Deepfake-Detect-Siglip2",
+  "version": "4.0.0",
+  "model": "prithivMLmods/deepfake-detector-model-v1",
   "model_status": "loaded",
+  "accuracy": "94.44%",
+  "architecture": "SigLIP-based binary classifier",
+  "device": "cuda",
   "timestamp": "2026-01-30T12:00:00"
 }
 ```
@@ -87,7 +93,7 @@ Content-Type: application/json
   "metadata": {...},
   "extractedFrames": ["/path/to/frame1.jpg", "/path/to/frame2.jpg"],
   "extractedAudio": "/path/to/audio.wav",
-  "modelVersion": "v2"
+  "modelVersion": "v4"
 }
 ```
 
@@ -100,9 +106,11 @@ Content-Type: application/json
   "audio_score": 0.0,
   "gan_fingerprint": 75.5,
   "temporal_consistency": 85.2,
-  "risk_score": 68.3,
+  "risk_score": 78.3,
   "confidence": 92.1,
-  "model_version": "v2",
+  "faces_detected": 28,
+  "total_frames": 30,
+  "model_version": "v4",
   "inference_time": 1234
 }
 ```
@@ -114,9 +122,11 @@ Content-Type: application/json
 - **mean_risk** (0-100): Average fake probability across frames
 - **audio_score** (0-100): Audio analysis score (0 for image-based model)
 - **gan_fingerprint** (0-100): GAN artifact detection score
-- **temporal_consistency** (0-100): Frame-to-frame consistency for videos
-- **risk_score** (0-100): Overall risk assessment (weighted combination)
-- **confidence** (0-100): Model confidence in the prediction
+- **temporal_consistency** (0-100): Frame-to-frame consistency for videos (higher = more consistent)
+- **risk_score** (0-100): Overall risk assessment (weighted combination of P90 and peak)
+- **confidence** (0-100): Model confidence in the prediction (how far from 0.5 uncertain)
+- **faces_detected** (int): Number of frames where faces were detected
+- **total_frames** (int): Total number of frames processed
 
 ## Model Inference Process
 
@@ -124,22 +134,24 @@ Content-Type: application/json
    - Single image: Preprocessed and analyzed directly
    - Video: Multiple frames extracted and processed (max 30 frames)
 
-2. **Face Detection** (optional):
-   - Uses MediaPipe for face detection
+2. **Face Detection** (OpenCV DNN):
+   - Uses OpenCV DNN face detector (SSD ResNet-10)
    - Crops and focuses on detected faces for better accuracy
+   - Falls back to full image if no face detected
 
 3. **Preprocessing**:
    - Convert to RGB
    - Hugging Face processor handles resizing and normalization
 
 4. **Inference**:
-   - Model classifies images as Fake or Real
+   - Model classifies images as Fake (Class 0) or Real (Class 1)
    - Returns probability scores for each class
 
 5. **Score Calculation**:
    - Frame-level predictions aggregated for videos
-   - Uses 90th percentile for robust scoring
+   - Uses 90th percentile (P90) for robust scoring
    - Temporal consistency calculated from frame variance
+   - Risk score combines P90 and peak scores with weighting
 
 ## Docker
 
@@ -166,6 +178,7 @@ The Dockerfile pre-downloads the model during build for faster startup.
 - GPU acceleration if CUDA is available
 - Frame sampling for videos (max 30 frames per video)
 - Efficient pipeline-based inference using Hugging Face Transformers
+- Single model architecture (simpler and faster than dual-model)
 
 ## Development
 
@@ -184,10 +197,21 @@ curl -X POST http://localhost:5000/api/v1/inference \
     "hash": "sha256:test123",
     "mediaType": "IMAGE",
     "extractedFrames": ["/path/to/image.jpg"],
-    "modelVersion": "v2"
+    "modelVersion": "v4"
   }'
 ```
 
+## Changes from v3.0
+
+### v4.0.0 - Major Update
+
+- **Replaced dual-model system** with single high-accuracy model
+- **New Model**: deepfake-detector-model-v1 (94.44% accuracy)
+- **Simplified architecture**: Single model inference (faster)
+- **Fixed video face detection tracking**: Now properly tracks faces per frame
+- **Improved logging**: Better visibility into inference process
+- **Updated score calculation**: More accurate confidence calculation
+
 ## Status
 
-✅ **Fully implemented** with Hugging Face Deepfake-Detect-Siglip2 model integration.
+✅ **Production ready** with deepfake-detector-model-v1 (94.44% accuracy)

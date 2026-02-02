@@ -15,8 +15,8 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir --timeout 300 --retries 5 -r requirements.txt
 
-# Pre-download the model during build for faster startup
-RUN python -c "from transformers import pipeline; pipeline('image-classification', model='prithivMLmods/Deepfake-Detect-Siglip2')"
+# Copy local model (no download needed!)
+COPY model /app/model
 
 # Copy application code
 COPY . .

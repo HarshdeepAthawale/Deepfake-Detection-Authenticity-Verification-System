@@ -1,6 +1,7 @@
 """
 Model Loader Module
-Loads and manages the Hugging Face Deepfake-Detect-Siglip2 model
+Loads and manages the deepfake-detector-model-v1
+High-accuracy deepfake detection model (94.44% accuracy)
 """
 
 import os
@@ -11,7 +12,8 @@ from transformers import pipeline
 logger = logging.getLogger(__name__)
 
 # Model configuration
-MODEL_ID = "prithivMLmods/Deepfake-Detect-Siglip2"
+LOCAL_MODEL_PATH = "/app/model"
+MODEL_ID_HF = "prithivMLmods/deepfake-detector-model-v1"
 
 # Global instances (singleton pattern)
 _pipeline = None
@@ -32,7 +34,7 @@ def get_device():
 
 def load_model():
     """
-    Load the Hugging Face Deepfake-Detect-Siglip2 model using pipeline
+    Load the deepfake-detector-model-v1 model using pipeline
 
     Returns:
         Loaded pipeline for image classification
@@ -46,13 +48,21 @@ def load_model():
     try:
         device = get_device()
 
-        logger.info(f'[MODEL_LOADER] Loading model: {MODEL_ID}')
+        # Check for local model first
+        if os.path.exists(LOCAL_MODEL_PATH):
+            model_path = LOCAL_MODEL_PATH
+            logger.info(f'[MODEL_LOADER] Using local model from: {LOCAL_MODEL_PATH}')
+        else:
+            model_path = MODEL_ID_HF
+            logger.info(f'[MODEL_LOADER] Downloading model from HuggingFace: {MODEL_ID_HF}')
+
+        logger.info(f'[MODEL_LOADER] Loading model: {model_path}')
 
         # Use pipeline for simple and reliable loading
         # The pipeline handles model and processor loading automatically
         _pipeline = pipeline(
             "image-classification",
-            model=MODEL_ID,
+            model=model_path,
             device=device
         )
 
@@ -82,3 +92,15 @@ def get_pipeline():
 def is_model_loaded():
     """Check if model is loaded"""
     return _pipeline is not None
+
+
+def get_model_info():
+    """Get information about loaded model"""
+    model_source = "local (/app/model)" if os.path.exists(LOCAL_MODEL_PATH) else MODEL_ID_HF
+    return {
+        'model': model_source,
+        'model_loaded': _pipeline is not None,
+        'device': 'cuda' if get_device() >= 0 else 'cpu',
+        'accuracy': '94.44%',
+        'architecture': 'SiglIP-based binary classifier'
+    }

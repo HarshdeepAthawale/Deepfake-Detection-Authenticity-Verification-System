@@ -4,7 +4,7 @@ Handles image preprocessing for the Hugging Face model
 """
 
 import os
-from PIL import Image
+from PIL import Image, ImageOps
 import logging
 
 # Import face detection module
@@ -36,10 +36,14 @@ def load_image(image_input):
             # File path
             if not os.path.exists(image_input):
                 raise FileNotFoundError(f'Image file not found: {image_input}')
-            image = Image.open(image_input).convert('RGB')
+            image = Image.open(image_input)
+            # Apply EXIF rotation (critical for mobile photos)
+            image = ImageOps.exif_transpose(image)
+            image = image.convert('RGB')
         elif isinstance(image_input, Image.Image):
-            # PIL Image
-            image = image_input.convert('RGB')
+            # PIL Image - apply EXIF rotation if available
+            image = ImageOps.exif_transpose(image_input)
+            image = image.convert('RGB')
         else:
             # Try to convert numpy array or other formats
             if hasattr(image_input, 'shape'):
@@ -55,7 +59,7 @@ def load_image(image_input):
         raise
 
 
-def preprocess_image(image_input, detect_faces=True):
+def preprocess_image(image_input, detect_faces=True, return_face_info=False):
     """
     Preprocess a single image for model inference
 
@@ -65,21 +69,31 @@ def preprocess_image(image_input, detect_faces=True):
             - File path (str)
             - numpy array
         detect_faces: If True, detect and crop face before preprocessing (default: True)
+        return_face_info: If True, return tuple (image, face_detected) (default: False)
 
     Returns:
         PIL Image ready for model input
+        If return_face_info=True: tuple (PIL Image, bool face_detected)
     """
     try:
         # Load image
         image = load_image(image_input)
+        face_detected = False
 
         # Apply face detection if enabled and available
         if detect_faces and FACE_DETECTION_AVAILABLE:
-            image = detect_and_crop_face(image)
-            logger.debug('[PREPROCESSING] Face detection applied')
+            cropped_image, bbox = detect_and_crop_face(image, return_bbox=True)
+            face_detected = bbox is not None
+            image = cropped_image
+            if face_detected:
+                logger.debug(f'[PREPROCESSING] Face detection applied, bbox={bbox}')
+            else:
+                logger.warning('[PREPROCESSING] No face detected, using full image')
         elif detect_faces and not FACE_DETECTION_AVAILABLE:
             logger.warning('[PREPROCESSING] Face detection requested but not available')
 
+        if return_face_info:
+            return image, face_detected
         return image
 
     except Exception as e:
