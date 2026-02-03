@@ -40,8 +40,8 @@ export const exportScanToPDF = async (scanId, outputPath) => {
         doc.text(`File Name: ${scan.fileName}`);
         doc.text(`Media Type: ${scan.mediaType}`);
         doc.text(`File Size: ${(scan.fileSize / 1024 / 1024).toFixed(2)} MB`);
-        doc.text(`Timestamp: ${scan.timestamp.toLocaleString()}`);
-        doc.text(`Operative: ${scan.operative}`);
+        doc.text(`Timestamp: ${scan.createdAt.toLocaleString()}`);
+        doc.text(`Operative: ${scan.operativeId}`);
         doc.moveDown();
 
         // Detection Results
@@ -49,35 +49,37 @@ export const exportScanToPDF = async (scanId, outputPath) => {
         doc.moveDown(0.5);
         doc.fontSize(12).font('Helvetica-Bold');
 
-        const verdictColor = scan.result === 'DEEPFAKE' ? 'red' : scan.result === 'SUSPICIOUS' ? 'orange' : 'green';
-        doc.fillColor(verdictColor).text(`Verdict: ${scan.result}`);
+        const verdict = scan.result?.verdict || scan.result?.status || 'UNKNOWN';
+        const verdictColor = verdict === 'DEEPFAKE' ? 'red' : verdict === 'SUSPICIOUS' ? 'orange' : 'green';
+        doc.fillColor(verdictColor).text(`Verdict: ${verdict}`);
         doc.fillColor('black');
 
         doc.fontSize(10).font('Helvetica');
-        doc.text(`Risk Score: ${scan.riskScore}/100`);
-        doc.text(`Confidence: ${scan.confidence}%`);
+        doc.text(`Risk Score: ${scan.result?.riskScore || 0}/100`);
+        doc.text(`Confidence: ${scan.result?.confidence || 0}%`);
         doc.moveDown();
 
         // Detailed Scores
         doc.fontSize(14).font('Helvetica-Bold').text('Detailed Analysis');
         doc.moveDown(0.5);
         doc.fontSize(10).font('Helvetica');
-        doc.text(`Video Score: ${scan.videoScore}/100`);
-        doc.text(`Audio Score: ${scan.audioScore}/100`);
-        doc.text(`GAN Fingerprint: ${scan.ganFingerprint}/100`);
-        doc.text(`Temporal Consistency: ${scan.temporalConsistency}/100`);
+        doc.text(`Video Score: ${scan.result?.metadata?.facialMatch !== undefined ? (100 - scan.result.metadata.facialMatch) : 0}/100`);
+        doc.text(`Audio Score: ${scan.result?.metadata?.audioMatch !== undefined ? (100 - scan.result.metadata.audioMatch) : 0}/100`);
+        doc.text(`GAN Fingerprint: ${scan.result?.metadata?.ganFingerprint || 0}/100`);
+        doc.text(`Temporal Consistency: ${scan.result?.metadata?.temporalConsistency || 0}/100`);
         doc.moveDown();
 
         // Metadata
-        if (scan.metadata) {
+        const perceptionData = scan.processingData?.perception;
+        if (perceptionData?.metadata) {
             doc.fontSize(14).font('Helvetica-Bold').text('Media Metadata');
             doc.moveDown(0.5);
             doc.fontSize(10).font('Helvetica');
-            if (scan.metadata.codec) doc.text(`Codec: ${scan.metadata.codec}`);
-            if (scan.metadata.bitrate) doc.text(`Bitrate: ${scan.metadata.bitrate}`);
-            if (scan.metadata.resolution) doc.text(`Resolution: ${scan.metadata.resolution}`);
-            if (scan.metadata.duration) doc.text(`Duration: ${scan.metadata.duration}s`);
-            if (scan.metadata.fps) doc.text(`FPS: ${scan.metadata.fps}`);
+            if (perceptionData.metadata.codec) doc.text(`Codec: ${perceptionData.metadata.codec}`);
+            if (perceptionData.metadata.bitrate) doc.text(`Bitrate: ${perceptionData.metadata.bitrate}`);
+            if (perceptionData.metadata.resolution) doc.text(`Resolution: ${perceptionData.metadata.resolution}`);
+            if (perceptionData.metadata.duration) doc.text(`Duration: ${perceptionData.metadata.duration}s`);
+            if (perceptionData.metadata.fps) doc.text(`FPS: ${perceptionData.metadata.fps}`);
             doc.moveDown();
         }
 
@@ -92,11 +94,12 @@ export const exportScanToPDF = async (scanId, outputPath) => {
         }
 
         // Explanation
-        if (scan.explanation) {
+        const explanations = scan.result?.explanations;
+        if (explanations && explanations.length > 0) {
             doc.fontSize(14).font('Helvetica-Bold').text('Analysis Explanation');
             doc.moveDown(0.5);
             doc.fontSize(10).font('Helvetica');
-            doc.text(scan.explanation, { align: 'justify' });
+            doc.text(explanations.join('. '), { align: 'justify' });
             doc.moveDown();
         }
 
@@ -162,16 +165,16 @@ export const exportScansToCSV = async (scanIds, outputPath) => {
                 scan._id,
                 `"${scan.fileName}"`,
                 scan.mediaType,
-                scan.result,
-                scan.riskScore,
-                scan.confidence,
-                scan.videoScore,
-                scan.audioScore,
-                scan.ganFingerprint,
-                scan.temporalConsistency,
+                scan.result?.verdict || scan.result?.status || 'UNKNOWN',
+                scan.result?.riskScore || 0,
+                scan.result?.confidence || 0,
+                scan.result?.metadata?.facialMatch !== undefined ? (100 - scan.result.metadata.facialMatch) : 0,
+                scan.result?.metadata?.audioMatch !== undefined ? (100 - scan.result.metadata.audioMatch) : 0,
+                scan.result?.metadata?.ganFingerprint || 0,
+                scan.result?.metadata?.temporalConsistency || 0,
                 (scan.fileSize / 1024 / 1024).toFixed(2),
-                scan.timestamp.toISOString(),
-                `"${scan.operative}"`,
+                scan.createdAt.toISOString(),
+                `"${scan.operativeId}"`,
                 scan.gpsCoordinates?.latitude || '',
                 scan.gpsCoordinates?.longitude || '',
             ];

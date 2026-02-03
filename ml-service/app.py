@@ -266,6 +266,11 @@ def inference():
 
             # Process first frame as image
             image_path = extracted_frames[0] if isinstance(extracted_frames, list) else extracted_frames
+            
+            # Validate path exists
+            if not os.path.exists(image_path):
+                raise ValueError(f'Image file not found: {image_path}')
+            
             image, face_found = preprocess_image(image_path, return_face_info=True)
             total_frames = 1
             faces_detected = 1 if face_found else 0
@@ -280,10 +285,21 @@ def inference():
         elif media_type == 'VIDEO':
             if not extracted_frames:
                 raise ValueError('No frame paths provided for VIDEO')
+            
+            # Validate frame paths exist
+            valid_paths = []
+            for frame_path in extracted_frames:
+                if os.path.exists(frame_path):
+                    valid_paths.append(frame_path)
+                else:
+                    logger.warning(f'[ML_SERVICE] Frame file not found: {frame_path}')
+            
+            if not valid_paths:
+                raise ValueError('No valid frame files found')
 
             # Process frames (limit to max 30 frames for performance)
             max_frames = 30
-            images, valid_frames = preprocess_frames(extracted_frames, max_frames=max_frames)
+            images, valid_frames = preprocess_frames(valid_paths, max_frames=max_frames)
 
             if not images or len(valid_frames) == 0:
                 raise ValueError('No valid frames processed')

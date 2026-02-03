@@ -26,6 +26,7 @@ import { generateFileHash } from '../security/encryption.js';
 import config from '../config/env.js';
 import logger from '../utils/logger.js';
 import { logAudit } from '../audit/audit.middleware.js';
+import Scan from './scan.model.js';
 // RBAC is handled in routes, not controller
 
 const __filename = fileURLToPath(import.meta.url);
@@ -120,8 +121,31 @@ export const uploadScan = async (req, res) => {
     const scan = await createScan(scanData);
 
     // Process scan asynchronously (pass userId for WebSocket targeting)
-    processScan(scanId, file.path, user.id).catch((error) => {
+    processScan(scanId, file.path, user.id).catch(async (error) => {
       logger.error(`Async scan processing failed for ${scanId}:`, error);
+
+      // Clean up file on processing failure
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+          logger.info(`Cleaned up file for failed scan: ${scanId}`);
+        }
+      } catch (cleanupError) {
+        logger.error(`Failed to cleanup file for scan ${scanId}:`, cleanupError);
+      }
+
+      // Update scan status to FAILED (already done in processScan, but ensure it)
+      try {
+        await Scan.findOneAndUpdate(
+          { scanId },
+          {
+            status: 'FAILED',
+            error: { message: error.message, stack: error.stack }
+          }
+        );
+      } catch (updateError) {
+        logger.error(`Failed to update scan status for ${scanId}:`, updateError);
+      }
     });
 
     logger.info(`Scan uploaded: ${scanId} by ${user.operativeId}`);
@@ -236,7 +260,7 @@ export const getScan = async (req, res) => {
     // Format response to match frontend expectations
     const response = {
       id: scan.scanId,
-      timestamp: new Date(scan.createdAt).toISOString(),
+      timestamp: scan.createdAt.toISOString(),
       verdict: scan.result?.verdict || 'PENDING',
       confidence: scan.result?.confidence || 0,
       riskScore: scan.result?.riskScore || 0,
@@ -339,7 +363,7 @@ export const getHistory = async (req, res) => {
     // Format scans to match frontend expectations
     const formattedScans = result.scans.map((scan) => ({
       id: scan.scanId,
-      timestamp: new Date(scan.createdAt).toISOString(),
+      timestamp: scan.createdAt.toISOString(),
       type: scan.mediaType,
       result: scan.result?.verdict || 'PENDING',
       score: scan.result?.confidence || 0,

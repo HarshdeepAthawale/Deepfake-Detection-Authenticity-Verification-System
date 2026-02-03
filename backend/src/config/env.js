@@ -7,6 +7,8 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
+import logger from '../utils/logger.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -62,6 +64,13 @@ const config = {
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
   },
+  ml: {
+    serviceUrl: process.env.ML_SERVICE_URL || 'http://localhost:5000',
+    enabled: process.env.ML_SERVICE_ENABLED !== 'false',
+    timeout: parseInt(process.env.ML_SERVICE_TIMEOUT || '30000', 10),
+    retries: parseInt(process.env.ML_SERVICE_RETRIES || '3', 10),
+    modelVersion: process.env.ML_MODEL_VERSION || 'v4',
+  },
   email: {
     smtp: {
       host: process.env.SMTP_HOST || '',
@@ -75,22 +84,40 @@ const config = {
 };
 
 // Validation
-if (!config.jwt.secret || config.jwt.secret.length < 32) {
-  console.warn('WARNING: JWT_SECRET should be at least 32 characters long');
+const isProduction = config.server.nodeEnv === 'production';
+
+// Production security validation
+if (isProduction) {
+  if (!config.jwt.secret || config.jwt.secret.includes('change-this') || config.jwt.secret.length < 32) {
+    throw new Error('CRITICAL: JWT_SECRET must be set to a secure value (min 32 chars) in production!');
+  }
+  if (!config.security.encryptionKey || config.security.encryptionKey.includes('change-this') || config.security.encryptionKey.length < 32) {
+    throw new Error('CRITICAL: ENCRYPTION_KEY must be set to a secure value (32 chars) in production!');
+  }
+  if (!config.security.encryptionIV || config.security.encryptionIV.includes('change-this') || config.security.encryptionIV.length < 16) {
+    throw new Error('CRITICAL: ENCRYPTION_IV must be set to a secure value (16 chars) in production!');
+  }
 }
 
-if (!config.security.encryptionKey || config.security.encryptionKey.length < 32) {
-  console.warn('WARNING: ENCRYPTION_KEY should be at least 32 characters long');
+// Development warnings
+if (!isProduction) {
+  if (!config.jwt.secret || config.jwt.secret.length < 32) {
+    logger.warn('WARNING: JWT_SECRET should be at least 32 characters long');
+  }
+
+  if (!config.security.encryptionKey || config.security.encryptionKey.length < 32) {
+    logger.warn('WARNING: ENCRYPTION_KEY should be at least 32 characters long');
+  }
 }
 
 // Google OAuth validation
 if (!config.google.clientId) {
-  console.warn('⚠️  WARNING: GOOGLE_CLIENT_ID is not set. Google OAuth will not work.');
-  console.warn('   Create backend/.env with: GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com');
+  logger.warn('⚠️  WARNING: GOOGLE_CLIENT_ID is not set. Google OAuth will not work.');
+  logger.warn('   Create backend/.env with: GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com');
 }
 
 if (config.google.clientId && !config.google.clientSecret) {
-  console.warn('⚠️  WARNING: GOOGLE_CLIENT_SECRET is not set. Token verification may fail.');
+  logger.warn('⚠️  WARNING: GOOGLE_CLIENT_SECRET is not set. Token verification may fail.');
 }
 
 export default config;

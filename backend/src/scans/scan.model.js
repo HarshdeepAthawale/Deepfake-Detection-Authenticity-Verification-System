@@ -163,9 +163,16 @@ scanSchema.index({ createdAt: -1 });
 scanSchema.index({ tags: 1 });
 scanSchema.index({ mediaType: 1 });
 
+// Compound indexes for common query patterns
+scanSchema.index({ userId: 1, status: 1, createdAt: -1 });
+scanSchema.index({ userId: 1, 'result.verdict': 1, createdAt: -1 });
+scanSchema.index({ batchId: 1, createdAt: -1 });
+scanSchema.index({ userId: 1, mediaType: 1, createdAt: -1 });
+scanSchema.index({ status: 1, 'result.verdict': 1 });
+
 // Text index for full-text search
-scanSchema.index({ 
-  fileName: 'text', 
+scanSchema.index({
+  fileName: 'text',
   'result.explanations': 'text',
   operativeId: 'text',
 });

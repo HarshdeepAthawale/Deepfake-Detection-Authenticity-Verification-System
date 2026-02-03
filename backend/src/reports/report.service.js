@@ -46,7 +46,7 @@ export const generatePDFReport = async (scan, outputPath) => {
       doc.text(`Media Type: ${scan.mediaType || 'N/A'}`);
       doc.text(`File Size: ${(scan.fileSize / 1024 / 1024).toFixed(2)} MB`);
       doc.text(`File Hash: ${scan.fileHash || 'N/A'}`);
-      doc.text(`Upload Date: ${scan.createdAt ? new Date(scan.createdAt).toLocaleString() : 'N/A'}`);
+      doc.text(`Upload Date: ${scan.createdAt ? scan.createdAt.toLocaleString() : 'N/A'}`);
       doc.text(`Operative ID: ${scan.operativeId || 'N/A'}`);
       doc.moveDown();
 
@@ -160,13 +160,13 @@ export const generateJSONExport = (scan) => {
     mimeType: scan.mimeType,
     status: scan.status,
     operativeId: scan.operativeId,
-    uploadedAt: scan.createdAt ? new Date(scan.createdAt).toISOString() : null,
+    uploadedAt: scan.createdAt ? scan.createdAt.toISOString() : null,
     result: scan.result || null,
     gpsCoordinates: scan.gpsCoordinates || null,
     tags: scan.tags || [],
     metadata: {
-      createdAt: scan.createdAt ? new Date(scan.createdAt).toISOString() : null,
-      updatedAt: scan.updatedAt ? new Date(scan.updatedAt).toISOString() : null,
+      createdAt: scan.createdAt ? scan.createdAt.toISOString() : null,
+      updatedAt: scan.updatedAt ? scan.updatedAt.toISOString() : null,
     },
   };
 };
@@ -211,7 +211,7 @@ export const generateCSVExport = (scans) => {
       result.riskScore || '',
       scan.fileHash || '',
       scan.operativeId || '',
-      scan.createdAt ? new Date(scan.createdAt).toISOString() : '',
+      scan.createdAt ? scan.createdAt.toISOString() : '',
       (scan.tags || []).join('; '),
       scan.gpsCoordinates?.latitude || '',
       scan.gpsCoordinates?.longitude || '',
