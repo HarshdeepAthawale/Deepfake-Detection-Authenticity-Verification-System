@@ -185,16 +185,6 @@ See [SETUP.md](./SETUP.md) for detailed instructions.
 
 ---
 
-## Default Test Users
-
-After running `npm run seed`:
-
-| Role | Email | Password | Operative ID |
-|------|-------|----------|--------------|
-| Admin | admin@sentinel.com | admin123 | ADMIN_1 |
-| Operative | operative@sentinel.com | operative123 | GHOST_1 |
-| Analyst | analyst@sentinel.com | analyst123 | ANALYST_1 |
-
 ---
 
 ## Response Format

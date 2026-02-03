@@ -401,29 +401,6 @@ The backend uses a 4-agent pipeline for deepfake detection:
 
 ---
 
-## Creating Test Users
-
-You can create users directly in MongoDB or via a script:
-
-```javascript
-// Example user creation script
-import User from './src/users/user.model.js';
-import { connectDB } from './src/config/db.js';
-
-await connectDB();
-
-const admin = new User({
-  email: 'admin@example.com',
-  password: 'admin123',
-  operativeId: 'ADMIN_1',
-  role: 'admin',
-});
-
-await admin.save();
-```
-
----
-
 ## Logging
 
 Logs are written to:

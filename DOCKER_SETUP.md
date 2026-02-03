@@ -63,10 +63,7 @@ docker-compose down -v
 docker-compose exec backend npm run seed
 ```
 
-This creates:
-- **Admin**: `admin@sentinel.com` / `admin123`
-- **Operative**: `operative@sentinel.com` / `operative123`
-- **Analyst**: `analyst@sentinel.com` / `analyst123`
+This creates default users for testing (refer to `backend/src/utils/seed.js` for details).
 
 ## Services
 

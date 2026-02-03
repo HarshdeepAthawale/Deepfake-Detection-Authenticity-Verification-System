@@ -142,16 +142,6 @@ docker-compose logs -f
 # ML Service: http://localhost:5001
 ```
 
-### Default Credentials
-
-After seeding the database (`docker-compose exec backend npm run seed`):
-
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | admin@sentinel.com | admin123 |
-| Operative | operative@sentinel.com | operative123 |
-| Analyst | analyst@sentinel.com | analyst123 |
-
 ---
 
 ## Installation
