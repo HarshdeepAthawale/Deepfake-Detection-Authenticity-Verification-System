@@ -173,7 +173,7 @@ export const exportScansToCSV = async (scanIds, outputPath) => {
                 scan.result?.metadata?.ganFingerprint || 0,
                 scan.result?.metadata?.temporalConsistency || 0,
                 (scan.fileSize / 1024 / 1024).toFixed(2),
-                scan.createdAt.toISOString(),
+                scan.createdAt instanceof Date ? scan.createdAt.toISOString() : (scan.createdAt || ''),
                 `"${scan.operativeId}"`,
                 scan.gpsCoordinates?.latitude || '',
                 scan.gpsCoordinates?.longitude || '',

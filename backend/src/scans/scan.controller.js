@@ -260,7 +260,7 @@ export const getScan = async (req, res) => {
     // Format response to match frontend expectations
     const response = {
       id: scan.scanId,
-      timestamp: scan.createdAt.toISOString(),
+      timestamp: scan.createdAt instanceof Date ? scan.createdAt.toISOString() : scan.createdAt,
       verdict: scan.result?.verdict || 'PENDING',
       confidence: scan.result?.confidence || 0,
       riskScore: scan.result?.riskScore || 0,
@@ -363,7 +363,7 @@ export const getHistory = async (req, res) => {
     // Format scans to match frontend expectations
     const formattedScans = result.scans.map((scan) => ({
       id: scan.scanId,
-      timestamp: scan.createdAt.toISOString(),
+      timestamp: scan.createdAt instanceof Date ? scan.createdAt.toISOString() : scan.createdAt,
       type: scan.mediaType,
       result: scan.result?.verdict || 'PENDING',
       score: scan.result?.confidence || 0,

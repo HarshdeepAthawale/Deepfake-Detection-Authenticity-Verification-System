@@ -112,6 +112,25 @@ export const emitScanFailed = (scanId, error) => {
 };
 
 /**
+ * Emit notification to a specific user
+ * @param {string} userId - User ID
+ * @param {Object} notification - Notification data
+ */
+export const emitNotification = (userId, notification) => {
+  if (!io) {
+    logger.warn('[SOCKET] Socket.IO not initialized, cannot emit notification');
+    return;
+  }
+
+  io.to(`user:${userId}`).emit('notification:new', {
+    ...notification,
+    receivedAt: new Date().toISOString(),
+  });
+
+  logger.debug(`[SOCKET] Emitted notification to user ${userId}`);
+};
+
+/**
  * Setup Socket.IO connection handlers
  * @param {Object} socket - Socket.IO socket instance
  */
@@ -163,5 +182,6 @@ export default {
   emitScanProgress,
   emitScanComplete,
   emitScanFailed,
+  emitNotification,
   setupSocketHandlers,
 };

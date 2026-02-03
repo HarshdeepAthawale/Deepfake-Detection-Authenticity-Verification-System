@@ -102,7 +102,6 @@ const scanSchema = new mongoose.Schema(
     tags: {
       type: [String],
       default: [],
-      index: true,
     },
     batchId: {
       type: String,

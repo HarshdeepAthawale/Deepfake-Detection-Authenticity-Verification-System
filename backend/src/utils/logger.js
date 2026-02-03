@@ -1,16 +1,27 @@
 /**
  * Winston Logger Configuration
  * Centralized logging with file and console output
+ * 
+ * NOTE: This module intentionally reads environment variables directly
+ * instead of importing from config/env.js to avoid circular dependencies.
+ * (env.js imports logger.js for warnings, so logger cannot import env.js)
  */
 
 import winston from 'winston';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
-import config from '../config/env.js';
+import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Load environment variables directly to avoid circular dependency
+dotenv.config({ path: join(__dirname, '../../.env') });
+
+// Read config values directly from environment
+const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Ensure logs directory exists
 const logsDir = join(__dirname, '../../logs');
@@ -38,7 +49,7 @@ const consoleFormat = winston.format.combine(
 );
 
 const logger = winston.createLogger({
-  level: config.logging.level,
+  level: LOG_LEVEL,
   format: logFormat,
   defaultMeta: { service: 'deepfake-detection-backend' },
   transports: [
@@ -59,7 +70,7 @@ const logger = winston.createLogger({
 });
 
 // If we're not in production, log to the console with simpler format
-if (config.server.nodeEnv !== 'production') {
+if (NODE_ENV !== 'production') {
   logger.add(
     new winston.transports.Console({
       format: winston.format.simple(),

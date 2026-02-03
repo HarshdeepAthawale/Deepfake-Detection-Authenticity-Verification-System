@@ -66,7 +66,6 @@ auditLogSchema.index({ resourceType: 1, resourceId: 1 });
 auditLogSchema.index({ operativeId: 1, createdAt: -1 });
 
 // Compound index for common queries
-auditLogSchema.index({ action: 1, createdAt: -1 });
 auditLogSchema.index({ resourceType: 1, createdAt: -1 });
 
 const AuditLog = mongoose.model('AuditLog', auditLogSchema);

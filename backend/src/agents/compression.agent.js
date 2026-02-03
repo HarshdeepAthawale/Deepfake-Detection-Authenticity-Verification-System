@@ -161,7 +161,7 @@ export const analyzeCompression = async (perceptionData, detectionScores) => {
     };
 
     logger.info(`[COMPRESSION_AGENT] Compression analysis complete`);
-    logger.info(`[COMPRESSION_AGENT] Quality Score: ${qualityAssessment.qualityScore}, Impact: +${compressionImpact} risk`);
+    logger.info(`[COMPRESSION_AGENT] Quality Score: ${qualityAssessment.qualityScore}, Impact: +${compressionRiskImpact} risk`);
     logger.info(`[COMPRESSION_AGENT] Adjusted Risk: ${compressionResults.riskScore}, Confidence: ${compressionResults.confidence}%`);
 
     return compressionResults;

@@ -160,13 +160,13 @@ export const generateJSONExport = (scan) => {
     mimeType: scan.mimeType,
     status: scan.status,
     operativeId: scan.operativeId,
-    uploadedAt: scan.createdAt ? scan.createdAt.toISOString() : null,
+    uploadedAt: scan.createdAt ? (scan.createdAt instanceof Date ? scan.createdAt.toISOString() : scan.createdAt) : null,
     result: scan.result || null,
     gpsCoordinates: scan.gpsCoordinates || null,
     tags: scan.tags || [],
     metadata: {
-      createdAt: scan.createdAt ? scan.createdAt.toISOString() : null,
-      updatedAt: scan.updatedAt ? scan.updatedAt.toISOString() : null,
+      createdAt: scan.createdAt ? (scan.createdAt instanceof Date ? scan.createdAt.toISOString() : scan.createdAt) : null,
+      updatedAt: scan.updatedAt ? (scan.updatedAt instanceof Date ? scan.updatedAt.toISOString() : scan.updatedAt) : null,
     },
   };
 };
@@ -211,7 +211,7 @@ export const generateCSVExport = (scans) => {
       result.riskScore || '',
       scan.fileHash || '',
       scan.operativeId || '',
-      scan.createdAt ? scan.createdAt.toISOString() : '',
+      scan.createdAt ? (scan.createdAt instanceof Date ? scan.createdAt.toISOString() : scan.createdAt) : '',
       (scan.tags || []).join('; '),
       scan.gpsCoordinates?.latitude || '',
       scan.gpsCoordinates?.longitude || '',

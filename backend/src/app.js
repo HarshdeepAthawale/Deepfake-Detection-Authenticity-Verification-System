@@ -29,22 +29,22 @@ app.use(helmet({
 
 // CORS configuration
 // Allow multiple origins for development (ports 3000-3005)
-const allowedOrigins = config.frontend.url 
+const allowedOrigins = config.frontend.url
   ? [config.frontend.url]
   : [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'http://localhost:3003',
-      'http://localhost:3004',
-      'http://localhost:3005',
-    ];
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:3003',
+    'http://localhost:3004',
+    'http://localhost:3005',
+  ];
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -61,13 +61,32 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Rate limiting
+// Rate limiting with localhost/development bypass
 const limiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
   max: config.rateLimit.maxRequests,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip rate limiting for localhost and Docker internal networks
+  skip: (req) => {
+    const ip = req.ip || req.connection?.remoteAddress || '';
+    // Whitelist localhost, loopback, and Docker network IPs
+    const whitelistedIPs = [
+      '127.0.0.1',
+      '::1',
+      '::ffff:127.0.0.1',
+      'localhost',
+    ];
+    // Check if IP is whitelisted or is a Docker internal network (172.x.x.x)
+    const isWhitelisted = whitelistedIPs.some(whitelistedIP => ip.includes(whitelistedIP));
+    const isDockerNetwork = ip.includes('172.') || ip.includes('::ffff:172.');
+
+    if (isWhitelisted || isDockerNetwork) {
+      return true; // Skip rate limiting
+    }
+    return false;
+  },
 });
 
 app.use('/api/', limiter);

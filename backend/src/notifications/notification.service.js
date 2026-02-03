@@ -6,8 +6,8 @@
 import Notification from './notification.model.js';
 import User from '../users/user.model.js';
 import { sendEmailNotification } from './email.service.js';
+import { emitNotification } from '../scans/scan.socket.js';
 import logger from '../utils/logger.js';
-// Note: WebSocket notifications are handled separately - socket instance not directly accessible from service
 
 /**
  * Create notification
@@ -26,7 +26,7 @@ export const createNotification = async (notificationData, sendEmail = false) =>
         const user = await User.findById(notificationData.userId);
         if (user && user.notificationPreferences?.emailEnabled) {
           // Check if notification type should trigger email
-          const shouldSendEmail = 
+          const shouldSendEmail =
             notificationData.priority === 'critical' ||
             notificationData.priority === 'high' ||
             (notificationData.type === 'deepfake_detected' && user.notificationPreferences?.emailOnDeepfake) ||
