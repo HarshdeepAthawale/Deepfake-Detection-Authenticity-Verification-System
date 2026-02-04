@@ -178,6 +178,31 @@ def calculate_scores(fake_probs, media_type, frame_count=1, faces_detected=0):
         # Use the average of how far predictions are from 0.5 (uncertain)
         confidence = float(np.mean([abs(p - 0.5) * 2 for p in fake_probs]) * 100)
 
+        # Apply confidence penalty based on face detection rate
+        # Lower face detection = lower confidence in results
+        if frame_count > 0:
+            face_detection_rate = faces_detected / frame_count
+            confidence_penalty = 0.0
+            
+            if face_detection_rate < 0.3:
+                # Very low face detection (<30%): 20% penalty
+                confidence_penalty = 0.20
+                logger.warning(f'[ML_SERVICE] Very low face detection rate: {face_detection_rate:.1%} - applying 20% confidence penalty')
+            elif face_detection_rate < 0.5:
+                # Low face detection (<50%): 10% penalty
+                confidence_penalty = 0.10
+                logger.warning(f'[ML_SERVICE] Low face detection rate: {face_detection_rate:.1%} - applying 10% confidence penalty')
+            elif face_detection_rate < 0.7:
+                # Moderate face detection (<70%): 5% penalty
+                confidence_penalty = 0.05
+                logger.info(f'[ML_SERVICE] Moderate face detection rate: {face_detection_rate:.1%} - applying 5% confidence penalty')
+            
+            # Apply penalty
+            if confidence_penalty > 0:
+                original_confidence = confidence
+                confidence = confidence * (1 - confidence_penalty)
+                logger.info(f'[ML_SERVICE] Confidence adjusted: {original_confidence:.2f}% → {confidence:.2f}%')
+
         # Calculate risk score (weighted combination)
         risk_score = video_score
         # If peak is significantly higher than P90, blend them
@@ -333,10 +358,14 @@ def inference():
         # Calculate inference time
         inference_time = int((time.time() - start_time) * 1000)
 
+        # Get model info for version tracking
+        model_info = get_model_info()
+
         # Build response
         response = {
             **scores,
-            'model_version': model_version,
+            'model_version': model_info['model_version'],
+            'model_name': model_info['model_name'],
             'inference_time': inference_time
         }
 

@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+**/node_modules/
 
 # next.js
 /.next/
@@ -9,6 +10,7 @@
 
 # production
 /build
+/dist
 
 # debug
 npm-debug.log*
@@ -24,7 +26,6 @@ yarn-error.log*
 
 # Keep .env.example files (these are templates)
 !.env.example
-!.env.example.local
 
 # vercel
 .vercel
@@ -40,6 +41,7 @@ __pycache__/
 venv/
 .venv/
 *.egg-info/
+.pytest_cache/
 
 # ML models (too large for GitHub)
 deepfake-detector-model-v1/
@@ -49,3 +51,35 @@ ml-service/model/
 *.pth
 *.onnx
 *.h5
+
+# Logs
+*.log
+logs/
+ml-service.log
+
+# Test files and directories
+test_images/
+test of ml pipeline/
+test_*.py
+*_test.py
+*_test.js
+
+# Uploads
+uploads/
+**/uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp

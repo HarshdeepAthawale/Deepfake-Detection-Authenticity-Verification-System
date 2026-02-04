@@ -171,6 +171,7 @@ export const callMLService = async (perceptionData) => {
         riskScore: result.risk_score || result.riskScore || 0,
         confidence: result.confidence || 0,
         modelVersion: result.model_version || mlConfig.modelVersion,
+        modelName: result.model_name || 'deepfake-detector-model-v1',
         inferenceTime: result.inference_time || 0,
         // New fields from ML Service v4.0.0
         facesDetected: result.faces_detected || 0,

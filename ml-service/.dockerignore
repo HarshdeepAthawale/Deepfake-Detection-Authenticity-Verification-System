@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .git/
 .env
+# Exclude model directory (will be mounted as volume)
+model/
+*.safetensors
+test_images/
+ml-service.log

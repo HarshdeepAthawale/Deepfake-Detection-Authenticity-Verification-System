@@ -1,4 +1,3 @@
-
 services:
   # MongoDB Database
   mongodb:
@@ -101,8 +100,34 @@ services:
       PORT: 5000
     volumes:
       - uploads:/app/uploads
+      - ./ml-service/model:/app/model # Mount model directory
     networks:
       - deepfake-network
+
+  # ML Service with GPU Support (Optional - requires NVIDIA Docker runtime)
+  # To use GPU: docker-compose up ml-service-gpu instead of ml-service
+  # ml-service-gpu:
+  #   build:
+  #     context: ./ml-service
+  #     dockerfile: Dockerfile.gpu
+  #   container_name: deepfake-ml-service-gpu
+  #   restart: unless-stopped
+  #   ports:
+  #     - "5001:5000"
+  #   environment:
+  #     PORT: 5000
+  #   volumes:
+  #     - uploads:/app/uploads
+  #     - ./ml-service/model:/app/model
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   networks:
+  #     - deepfake-network
 
   # Frontend Next.js Application
   frontend:

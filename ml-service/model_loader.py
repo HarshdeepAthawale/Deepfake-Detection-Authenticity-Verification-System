@@ -94,11 +94,15 @@ def is_model_loaded():
     return _pipeline is not None
 
 
+
 def get_model_info():
     """Get information about loaded model"""
     model_source = "local (/app/model)" if os.path.exists(LOCAL_MODEL_PATH) else MODEL_ID_HF
     return {
         'model': model_source,
+        'model_name': 'deepfake-detector-model-v1',
+        'model_version': 'v1.0.0',
+        'model_id': MODEL_ID_HF,
         'model_loaded': _pipeline is not None,
         'device': 'cuda' if get_device() >= 0 else 'cpu',
         'accuracy': '94.44%',

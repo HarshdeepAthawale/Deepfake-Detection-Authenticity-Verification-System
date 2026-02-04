@@ -88,6 +88,8 @@ const scanSchema = new mongoose.Schema(
         ganFingerprint: Number,
         temporalConsistency: Number,
       },
+      modelVersion: String,
+      modelName: String,
     },
     processingData: {
       perception: mongoose.Schema.Types.Mixed,

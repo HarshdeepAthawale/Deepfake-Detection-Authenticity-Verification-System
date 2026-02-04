@@ -97,9 +97,33 @@ export const processMedia = async (filePath, scanId) => {
     if (isVideo) {
       try {
         const framesDir = path.join(processingDir, 'frames');
-        // Increase frame rate to capture more temporal data (4fps)
-        // Limit to max 60 frames to prevent OOM
-        const frames = await extractFrames(filePath, framesDir, 4, 60);
+        
+        // Adaptive frame sampling based on video duration
+        const duration = perceptionResults.duration || 0;
+        let frameRate = 4; // Default 4 fps
+        let maxFrames = 60; // Default max 60 frames
+        
+        if (duration <= 10) {
+          // Short videos (≤10s): 4 fps, max 40 frames
+          frameRate = 4;
+          maxFrames = 40;
+        } else if (duration <= 30) {
+          // Medium videos (≤30s): 3 fps, max 90 frames
+          frameRate = 3;
+          maxFrames = 90;
+        } else if (duration <= 60) {
+          // Long videos (≤60s): 2 fps, max 120 frames
+          frameRate = 2;
+          maxFrames = 120;
+        } else {
+          // Very long videos (>60s): 1 fps, max 120 frames
+          frameRate = 1;
+          maxFrames = 120;
+        }
+        
+        logger.info(`[PERCEPTION_AGENT] Adaptive sampling: duration=${duration}s, fps=${frameRate}, maxFrames=${maxFrames}`);
+        
+        const frames = await extractFrames(filePath, framesDir, frameRate, maxFrames);
         perceptionResults.extractedFrames = frames;
         logger.info(`[PERCEPTION_AGENT] Extracted ${frames.length} frames`);
       } catch (error) {
