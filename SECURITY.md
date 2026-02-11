@@ -70,6 +70,34 @@ Send an email to the project maintainers with:
 - Rate limiting implemented
 - CORS configured for specific origins
 
+## Security Scan Report
+
+*Last scan: 2025-02-12*
+
+### Summary
+- **Helmet**: Enabled for HTTP headers.
+- **Rate limiting**: Applied (express-rate-limit).
+- **Auth**: JWT + `authenticate` middleware on protected routes; `/api/auth` is public by design.
+- **CORS**: Restricts origins (localhost in dev).
+- **File exports**: PDF/CSV filenames are server-generated (scanId + timestamp), no path traversal risk.
+- **Chart UI**: `dangerouslySetInnerHTML` in `components/ui/chart.tsx` uses only build-time theme/color data, not user input.
+
+### Findings to Address
+
+| Area | Risk | Recommendation |
+|------|------|----------------|
+| **Default secrets** (`backend/src/config/env.js`) | High if deployed without env | Ensure production sets `JWT_SECRET`, `ENCRYPTION_KEY`, `ENCRYPTION_IV` (no defaults in prod). Consider failing startup when `NODE_ENV=production` and these are unset. |
+| **Create-admin script** (`backend/scripts/create-admin.js`) | Medium | Hardcoded email/password (`Admin@123`). Use env vars (e.g. `ADMIN_EMAIL`, `ADMIN_PASSWORD`) or prompt; remove defaults before production use. |
+| **MongoDB $regex** (`user.service.js`, `case.service.js`) | Low–Medium (ReDoS) | `filters.search` is passed directly to `$regex`. Escape regex special characters or use a sanitizer to prevent ReDoS and injection. |
+| **Test secrets** (`backend/tests/setup.js`) | Low | `JWT_SECRET` for tests is fine; keep test DB and secrets separate from production. |
+| **kill-port.js** | Low | Uses `exec` with numeric port and parsed PIDs; ensure this script is not exposed to untrusted input (CLI only). |
+
+### Good Practices in Place
+- `.env*` (and `.env.example`) in `.gitignore`; no real credentials in repo.
+- Passwords hashed with bcrypt (configurable rounds).
+- Sensitive fields (e.g. password, token) excluded from audit logs.
+- Protected routes use `authenticate`; admin routes use RBAC.
+
 ## Contact
 
 For security concerns, please contact the project maintainers through GitHub.
