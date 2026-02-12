@@ -224,92 +224,15 @@ choco install ffmpeg
 
 ## Configuration
 
-### Environment Variables
+### Environment Setup
 
-Create a `.env` file in the project root:
-
-```env
-# ===========================================
-# Server Configuration
-# ===========================================
-PORT=3001
-NODE_ENV=development
-
-# ===========================================
-# Database
-# ===========================================
-MONGODB_URI=mongodb://localhost:27017/deepfake-detection
-DB_NAME=deepfake-detection
-
-# ===========================================
-# JWT Authentication
-# ===========================================
-JWT_SECRET=your-super-secret-jwt-key-minimum-32-characters
-JWT_EXPIRES_IN=24h
-JWT_REFRESH_EXPIRES_IN=7d
-
-# ===========================================
-# File Upload
-# ===========================================
-MAX_FILE_SIZE=500000000
-UPLOAD_PATH=./uploads
-ALLOWED_MIME_TYPES=video/mp4,video/avi,video/mov,video/webm,audio/mpeg,audio/wav,audio/mp3,image/jpeg,image/png
-
-# ===========================================
-# Security
-# ===========================================
-BCRYPT_ROUNDS=12
-ENCRYPTION_KEY=your-32-character-encryption-key
-ENCRYPTION_IV=your-16-character-iv
-
-# ===========================================
-# Logging
-# ===========================================
-LOG_LEVEL=info
-LOG_FILE_PATH=./logs/app.log
-
-# ===========================================
-# Rate Limiting
-# ===========================================
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-
-# ===========================================
-# ML Service
-# ===========================================
-ML_SERVICE_URL=http://localhost:5000
-ML_SERVICE_ENABLED=true
-ML_SERVICE_TIMEOUT=30000
-ML_SERVICE_RETRIES=3
-ML_MODEL_VERSION=v1
-
-# ===========================================
-# Redis (Optional)
-# ===========================================
-REDIS_URL=redis://localhost:6379
-
-# ===========================================
-# Frontend
-# ===========================================
-FRONTEND_URL=http://localhost:3002
-
-# ===========================================
-# Google OAuth (Optional)
-# ===========================================
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-
-# ===========================================
-# Email Service (Optional)
-# ===========================================
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=your-email@example.com
-SMTP_PASSWORD=your-password
-EMAIL_FROM=noreply@sentinel-x.com
-```
+1. Copy the environment template: `cp .env.example .env`
+2. Generate required secrets using the commands below and add them to your `.env` file.
+3. Update other values (MongoDB URI, URLs, etc.) as needed for your environment.
 
 ### Generate Secrets
+
+**Required** — Generate these secrets and set them in your `.env` file:
 
 ```bash
 # Generate JWT_SECRET
@@ -321,6 +244,8 @@ openssl rand -base64 32 | cut -c1-32
 # Generate ENCRYPTION_IV (16 characters)
 openssl rand -base64 16 | cut -c1-16
 ```
+
+See `.env.example` for the full list of environment variables.
 
 ---
 
@@ -710,34 +635,6 @@ deepfake-detection-system/
 ├── docker-compose.yml            # Docker orchestration
 ├── Dockerfile                    # Frontend Dockerfile
 └── package.json                  # Frontend dependencies
-```
-
----
-
-## WebSocket Events
-
-Real-time scan updates via Socket.IO:
-
-```javascript
-// Connect with authentication
-const socket = io('http://localhost:3001', {
-  auth: { token: 'your_jwt_token' }
-});
-
-// Listen for progress updates
-socket.on('scan:progress', (data) => {
-  // { scanId, progress, stage }
-});
-
-// Listen for completion
-socket.on('scan:complete', (data) => {
-  // { scanId, result, riskScore, confidence }
-});
-
-// Listen for errors
-socket.on('scan:error', (data) => {
-  // { scanId, error }
-});
 ```
 
 ---
