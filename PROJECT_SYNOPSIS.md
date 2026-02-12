@@ -5,10 +5,10 @@
 **Project Title:** SENTINEL – Deepfake Detection & Authenticity Verification System  
 **Course Name & Code:** UCS310 – Database Management Systems  
 **Degree & Year:** B.Tech (2nd Year)  
-**Department / Institute Name:** [To be filled]  
-**Group Members (2–3 students) with Roll Numbers:** Harshdeep Athawale (1024031062), Aakriti Chauhan (1024031055), Sehaj Dhillon (1024030620)  
-**Lab Instructor Name:** [To be filled]  
-**Academic Year:** [To be filled]
+**Department / Institute Name:** Computer Engineering, Thapar Institute of Engineering and Technology  
+**Group Members with Roll Numbers:** Harshdeep Athawale (1024031062), Aakriti Chauhan (1024031055), Sehaj Dhillon (1024030620)  
+**Lab Instructor Name:** Abhishelly Sharma  
+**Academic Year:** [2024-2028]
 
 ---
 
