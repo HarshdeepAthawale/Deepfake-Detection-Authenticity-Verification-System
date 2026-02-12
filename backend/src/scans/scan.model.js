@@ -146,6 +146,29 @@ const scanSchema = new mongoose.Schema(
       ref: 'User',
       index: true,
     },
+    feedback: {
+      correctedVerdict: {
+        type: String,
+        enum: ['DEEPFAKE', 'SUSPICIOUS', 'AUTHENTIC'],
+      },
+      correctedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+      correctedByOperativeId: {
+        type: String,
+      },
+      correctedAt: {
+        type: Date,
+      },
+      notes: {
+        type: String,
+      },
+      trainingFramePaths: {
+        type: [String],
+        default: [],
+      },
+    },
   },
   {
     timestamps: true,
@@ -170,6 +193,7 @@ scanSchema.index({ userId: 1, 'result.verdict': 1, createdAt: -1 });
 scanSchema.index({ batchId: 1, createdAt: -1 });
 scanSchema.index({ userId: 1, mediaType: 1, createdAt: -1 });
 scanSchema.index({ status: 1, 'result.verdict': 1 });
+scanSchema.index({ 'feedback.correctedVerdict': 1 });
 
 // Text index for full-text search
 scanSchema.index({

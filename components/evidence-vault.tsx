@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Filter, Download, ExternalLink, FileText, Database, AlertTriangle, RefreshCcw } from "lucide-react"
+import { Search, Filter, ExternalLink, FileText, Database, AlertTriangle, RefreshCcw } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { apiService, type ScanHistoryItem, type ScanFilters } from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
 import { ExportMenu } from "@/components/reports/export-menu"
+import { ScanDetailSheet } from "@/components/scan-detail-sheet"
 
 export function EvidenceVault() {
   const { isAuthenticated } = useAuth()
@@ -20,6 +21,8 @@ export function EvidenceVault() {
   const [total, setTotal] = useState(0)
   const [filters, setFilters] = useState<ScanFilters>({})
   const [showFilters, setShowFilters] = useState(false)
+  const [detailScanId, setDetailScanId] = useState<string | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   const loadScans = async () => {
     if (!isAuthenticated) {
@@ -71,14 +74,9 @@ export function EvidenceVault() {
   // Backend handles filtering now, so no need for client-side filtering
   const filteredScans = scans
 
-  const handleViewDetails = async (scanId: string) => {
-    try {
-      const response = await apiService.getScanDetails(scanId)
-      // You could open a modal or navigate to a details page here
-      console.log("Scan details:", response.data)
-    } catch (err) {
-      console.error("Failed to load scan details:", err)
-    }
+  const handleViewDetails = (scanId: string) => {
+    setDetailScanId(scanId)
+    setDetailOpen(true)
   }
 
   const handleDelete = async (scanId: string) => {
@@ -333,6 +331,7 @@ export function EvidenceVault() {
                     className="text-primary hover:text-white p-1 transition-colors"
                     title="View Full Report"
                     onClick={() => handleViewDetails(item.id)}
+                    aria-label="View scan details"
                   >
                     <ExternalLink size={16} />
                   </button>
@@ -416,6 +415,13 @@ export function EvidenceVault() {
           </Button>
         </div>
       </div>
+
+      <ScanDetailSheet
+        scanId={detailScanId}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onFeedbackSubmitted={loadScans}
+      />
     </div>
   )
 }

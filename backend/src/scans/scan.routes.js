@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { uploadScan, batchUploadScan, getScan, getHistory, updateTags, deleteScanHandler, shareScanHandler, addCommentHandler, assignScanHandler, upload, uploadMultiple } from './scan.controller.js';
+import { uploadScan, batchUploadScan, getScan, getHistory, updateTags, deleteScanHandler, shareScanHandler, addCommentHandler, assignScanHandler, submitFeedbackHandler, upload, uploadMultiple } from './scan.controller.js';
 import { authenticate } from '../auth/auth.middleware.js';
 import { requirePermission, PERMISSIONS } from '../security/rbac.js';
 
@@ -112,6 +112,17 @@ router.post(
   '/:id/assign',
   requirePermission(PERMISSIONS.SCAN_VIEW_ALL),
   assignScanHandler
+);
+
+/**
+ * @route   POST /api/scans/:id/feedback
+ * @desc    Submit analyst feedback (corrected verdict) for self-learning
+ * @access  Private (requires scan:view:all - analysts and admins only)
+ */
+router.post(
+  '/:id/feedback',
+  requirePermission(PERMISSIONS.SCAN_VIEW_ALL),
+  submitFeedbackHandler
 );
 
 export default router;

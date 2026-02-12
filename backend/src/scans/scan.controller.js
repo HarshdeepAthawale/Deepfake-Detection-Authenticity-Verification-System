@@ -21,6 +21,7 @@ import {
   shareScan,
   addComment,
   assignScan,
+  submitFeedback,
 } from './scan.service.js';
 import { generateFileHash } from '../security/encryption.js';
 import config from '../config/env.js';
@@ -276,6 +277,12 @@ export const getScan = async (req, res) => {
       mediaType: scan.mediaType,
       fileName: scan.fileName,
       gpsCoordinates: scan.gpsCoordinates || null,
+      feedback: scan.feedback ? {
+        correctedVerdict: scan.feedback.correctedVerdict,
+        correctedByOperativeId: scan.feedback.correctedByOperativeId,
+        correctedAt: scan.feedback.correctedAt,
+        notes: scan.feedback.notes,
+      } : null,
     };
 
     res.status(200).json({
@@ -582,6 +589,73 @@ export const assignScanHandler = async (req, res) => {
   }
 };
 
+/**
+ * Submit analyst feedback (corrected verdict) for self-learning
+ * POST /api/scans/:id/feedback
+ */
+export const submitFeedbackHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { correctedVerdict, notes } = req.body;
+    const user = req.user;
+
+    if (!correctedVerdict || typeof correctedVerdict !== 'string') {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'correctedVerdict is required and must be DEEPFAKE, SUSPICIOUS, or AUTHENTIC',
+      });
+    }
+
+    const scan = await submitFeedback(
+      id,
+      correctedVerdict.toUpperCase().trim(),
+      notes ? String(notes).trim() : undefined,
+      user.id,
+      user.operativeId,
+      user.role
+    );
+
+    await logAudit(req, 'scan.feedback', {
+      scanId: id,
+      originalVerdict: scan.result?.verdict,
+      correctedVerdict: scan.feedback.correctedVerdict,
+      correctedBy: user.operativeId,
+    }, 'success');
+
+    res.status(200).json({
+      success: true,
+      message: 'Feedback submitted successfully',
+      data: {
+        scanId: scan.scanId,
+        feedback: {
+          correctedVerdict: scan.feedback.correctedVerdict,
+          correctedByOperativeId: scan.feedback.correctedByOperativeId,
+          correctedAt: scan.feedback.correctedAt,
+          notes: scan.feedback.notes,
+        },
+      },
+    });
+  } catch (error) {
+    logger.error('Submit feedback error:', error);
+    if (error.message.includes('Only analysts and admins')) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: error.message,
+      });
+    }
+    if (error.message === 'Scan not found' || error.message.includes('Feedback can only be submitted') || error.message.includes('Corrected verdict must differ')) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: error.message,
+      });
+    }
+    res.status(500).json({
+      error: 'Failed to submit feedback',
+      message: error.message,
+    });
+  }
+};
+
 export default {
   uploadScan,
   batchUploadScan,
@@ -592,6 +666,7 @@ export default {
   shareScanHandler,
   addCommentHandler,
   assignScanHandler,
+  submitFeedbackHandler,
   upload,
   uploadMultiple,
 };

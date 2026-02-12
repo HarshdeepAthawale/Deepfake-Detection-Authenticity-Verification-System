@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { getAdminStats, getMLHealth, getMLConfigEndpoint } from './admin.controller.js';
+import { getAdminStats, getMLHealth, getMLConfigEndpoint, getFeedbackStats } from './admin.controller.js';
 import {
   getAnalyticsOverview,
   getAnalyticsTrends,
@@ -50,6 +50,17 @@ router.get(
   '/ml/config',
   requirePermission(PERMISSIONS.SYSTEM_ADMIN),
   getMLConfigEndpoint
+);
+
+/**
+ * @route   GET /api/admin/feedback/stats
+ * @desc    Get feedback count for self-learning retraining
+ * @access  Private (requires system:admin permission)
+ */
+router.get(
+  '/feedback/stats',
+  requirePermission(PERMISSIONS.SYSTEM_ADMIN),
+  getFeedbackStats
 );
 
 /**

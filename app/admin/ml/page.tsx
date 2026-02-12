@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { TacticalShell } from "@/components/tactical-shell"
 import { AdminProtectedRoute } from "@/components/admin-protected-route"
 import { apiService } from "@/lib/api"
-import { Brain, Activity, Server, Settings, AlertCircle, CheckCircle2, XCircle } from "lucide-react"
+import { Brain, Activity, Server, Settings, AlertCircle, CheckCircle2, XCircle, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -26,9 +26,16 @@ interface MLConfig {
   confidenceThreshold: number
 }
 
+interface FeedbackStats {
+  feedbackCount: number
+  minForRetraining: number
+  readyForRetraining: boolean
+}
+
 export default function MLConfigPage() {
   const [health, setHealth] = useState<MLHealth | null>(null)
   const [config, setConfig] = useState<MLConfig | null>(null)
+  const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -39,9 +46,10 @@ export default function MLConfigPage() {
   const loadMLData = async () => {
     try {
       setLoading(true)
-      const [healthResponse, configResponse] = await Promise.all([
+      const [healthResponse, configResponse, feedbackResponse] = await Promise.all([
         apiService.getMLHealth(),
         apiService.getMLConfig(),
+        apiService.getFeedbackStats(),
       ])
 
       if (healthResponse.success) {
@@ -49,6 +57,9 @@ export default function MLConfigPage() {
       }
       if (configResponse.success) {
         setConfig(configResponse.data)
+      }
+      if (feedbackResponse.success) {
+        setFeedbackStats(feedbackResponse.data)
       }
     } catch (error) {
       console.error("Failed to load ML data:", error)
@@ -146,6 +157,56 @@ export default function MLConfigPage() {
                   </div>
                 )}
               </div>
+
+              {/* Self-Learning Feedback Stats */}
+              {feedbackStats && (
+                <div className="bg-card/30 border border-primary/10 rounded-sm p-6 backdrop-blur-sm">
+                  <h2 className="text-sm font-bold text-primary mb-4 border-b border-primary/10 pb-2 uppercase tracking-tighter flex items-center gap-2">
+                    <RotateCcw size={14} />
+                    SELF_LEARNING_FEEDBACK
+                  </h2>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-[10px] font-mono text-muted-foreground uppercase mb-1">
+                          CORRECTIONS_COLLECTED
+                        </div>
+                        <div className="text-2xl font-bold font-mono text-primary">
+                          {feedbackStats.feedbackCount}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-mono text-muted-foreground uppercase mb-1">
+                          MIN_FOR_RETRAINING
+                        </div>
+                        <div className="text-2xl font-bold font-mono">
+                          {feedbackStats.minForRetraining}
+                        </div>
+                      </div>
+                    </div>
+                    <div className={cn(
+                      "flex items-center gap-2 p-3 rounded border text-xs font-mono",
+                      feedbackStats.readyForRetraining
+                        ? "bg-success/10 border-success/30 text-success"
+                        : "bg-muted/30 border-primary/20 text-muted-foreground"
+                    )}>
+                      {feedbackStats.readyForRetraining ? (
+                        <CheckCircle2 size={16} />
+                      ) : (
+                        <AlertCircle size={16} />
+                      )}
+                      {feedbackStats.readyForRetraining
+                        ? `Ready for periodic retraining (${feedbackStats.feedbackCount} corrections)`
+                        : `Need ${feedbackStats.minForRetraining - feedbackStats.feedbackCount} more corrections for retraining`
+                      }
+                    </div>
+                    <p className="text-[10px] font-mono text-muted-foreground">
+                      Analysts can correct verdicts via the Evidence Vault (View Full Report → Correct Verdict).
+                      Collected feedback is used for periodic model fine-tuning.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* ML Service Configuration */}
               {config && (

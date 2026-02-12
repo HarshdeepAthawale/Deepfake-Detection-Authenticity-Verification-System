@@ -4,7 +4,9 @@
  */
 
 import fs from 'fs';
+import path from 'path';
 import Scan from './scan.model.js';
+import config from '../config/env.js';
 import { processMedia } from '../agents/perception.agent.js';
 import { detectDeepfake } from '../agents/detection.agent.js';
 import { analyzeCompression } from '../agents/compression.agent.js';
@@ -684,6 +686,152 @@ export const addComment = async (scanId, text, userId, operativeId, userRole) =>
 };
 
 /**
+ * Copy frames to training dataset when feedback is submitted
+ * @param {Object} scan - Scan document with processingData
+ * @param {string} correctedVerdict - DEEPFAKE, SUSPICIOUS, or AUTHENTIC
+ * @returns {string[]} Array of copied frame paths (for training dataset)
+ */
+const copyFramesToTrainingDataset = async (scan, correctedVerdict) => {
+  const trainingFramePaths = [];
+  const perception = scan.processingData?.perception;
+  const extractedFrames = perception?.extractedFrames;
+
+  if (!extractedFrames || !Array.isArray(extractedFrames) || extractedFrames.length === 0) {
+    return trainingFramePaths;
+  }
+
+  try {
+    const baseDir = config.upload.uploadPath || './uploads';
+    const trainingDir = path.join(baseDir, 'training_dataset');
+
+    // Map verdict to folder: AUTHENTIC=real, DEEPFAKE/SUSPICIOUS=fake
+    const label = correctedVerdict === 'AUTHENTIC' ? 'real' : 'fake';
+    const targetDir = path.join(trainingDir, label);
+
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    // Sample frames: max 5 for videos to avoid duplication, 1 for images
+    const maxFrames = scan.mediaType === 'VIDEO' ? 5 : 1;
+    const step = Math.max(1, Math.floor(extractedFrames.length / maxFrames));
+    const framesToCopy = [];
+    for (let i = 0; i < extractedFrames.length && framesToCopy.length < maxFrames; i += step) {
+      framesToCopy.push(extractedFrames[i]);
+    }
+    if (framesToCopy.length === 0 && extractedFrames.length > 0) {
+      framesToCopy.push(extractedFrames[0]);
+    }
+
+    for (let idx = 0; idx < framesToCopy.length; idx++) {
+      const srcPath = framesToCopy[idx];
+      if (!srcPath || !fs.existsSync(srcPath)) continue;
+
+      const ext = path.extname(srcPath) || '.jpg';
+      const destFilename = `${scan.scanId}_${idx}${ext}`.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const destPath = path.join(targetDir, destFilename);
+
+      fs.copyFileSync(srcPath, destPath);
+      trainingFramePaths.push(destPath);
+    }
+
+    logger.info(`[SCAN_SERVICE] Copied ${trainingFramePaths.length} frames to training dataset for scan: ${scan.scanId}`);
+  } catch (error) {
+    logger.warn(`[SCAN_SERVICE] Failed to copy frames to training dataset: ${error.message}`);
+  }
+
+  return trainingFramePaths;
+};
+
+/**
+ * Submit analyst feedback (corrected verdict) for a scan
+ * Used for self-learning / periodic model retraining
+ * @param {string} scanId - Scan ID
+ * @param {string} correctedVerdict - DEEPFAKE, SUSPICIOUS, or AUTHENTIC
+ * @param {string} notes - Optional analyst notes
+ * @param {string} userId - Current user ID
+ * @param {string} operativeId - Current user operative ID
+ * @param {string} userRole - Current user role (analyst or admin only)
+ * @returns {Promise<Object>} Updated scan
+ */
+export const submitFeedback = async (scanId, correctedVerdict, notes, userId, operativeId, userRole) => {
+  try {
+    // Only analysts and admins can submit feedback
+    if (userRole !== 'admin' && userRole !== 'analyst') {
+      throw new Error('Only analysts and admins can submit verdict corrections');
+    }
+
+    const query = { scanId };
+    const scan = await Scan.findOne(query);
+    if (!scan) {
+      throw new Error('Scan not found');
+    }
+
+    // Scan must be completed
+    if (scan.status !== 'COMPLETED') {
+      throw new Error('Feedback can only be submitted for completed scans');
+    }
+
+    const originalVerdict = scan.result?.verdict;
+    if (!originalVerdict) {
+      throw new Error('Scan has no verdict to correct');
+    }
+
+    // Corrected verdict must differ from original
+    if (correctedVerdict === originalVerdict) {
+      throw new Error('Corrected verdict must differ from the original verdict');
+    }
+
+    // Validate correctedVerdict
+    const validVerdicts = ['DEEPFAKE', 'SUSPICIOUS', 'AUTHENTIC'];
+    if (!validVerdicts.includes(correctedVerdict)) {
+      throw new Error('Invalid verdict. Must be DEEPFAKE, SUSPICIOUS, or AUTHENTIC');
+    }
+
+    // Copy frames to training dataset for future retraining
+    const trainingFramePaths = await copyFramesToTrainingDataset(scan, correctedVerdict);
+
+    const feedback = {
+      correctedVerdict,
+      correctedBy: userId,
+      correctedByOperativeId: operativeId,
+      correctedAt: new Date(),
+      notes: notes || undefined,
+      trainingFramePaths,
+    };
+
+    const updatedScan = await Scan.findOneAndUpdate(
+      { scanId },
+      { feedback },
+      { new: true }
+    );
+
+    // Invalidate cache
+    await invalidate([makeKey('scan', `${scanId}:${userId}`)]);
+    await delPattern('scan:history:*');
+
+    logger.info(`[SCAN_SERVICE] Feedback submitted for scan ${scanId}: ${originalVerdict} -> ${correctedVerdict} by ${operativeId}`);
+
+    return updatedScan.toObject();
+  } catch (error) {
+    logger.error('Submit feedback error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get count of scans with feedback (for retraining eligibility)
+ * @param {string} userRole - User role (admin only for system-wide count)
+ * @returns {Promise<number>}
+ */
+export const getFeedbackCount = async (userRole) => {
+  if (userRole !== 'admin') {
+    return 0;
+  }
+  return Scan.countDocuments({ 'feedback.correctedVerdict': { $exists: true, $ne: null } });
+};
+
+/**
  * Assign scan to user
  * @param {string} scanId - Scan ID
  * @param {string} assignToUserId - User ID to assign to
@@ -739,5 +887,7 @@ export default {
   shareScan,
   addComment,
   assignScan,
+  submitFeedback,
+  getFeedbackCount,
 };
 

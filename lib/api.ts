@@ -5,6 +5,13 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
 
+export interface ScanFeedback {
+  correctedVerdict: "AUTHENTIC" | "DEEPFAKE" | "SUSPICIOUS"
+  correctedByOperativeId?: string
+  correctedAt?: string
+  notes?: string
+}
+
 export interface ScanResult {
   id: string
   timestamp: string
@@ -28,6 +35,7 @@ export interface ScanResult {
     latitude: number
     longitude: number
   } | null
+  feedback?: ScanFeedback | null
 }
 
 export interface ScanHistoryItem {
@@ -419,6 +427,23 @@ export const apiService = {
   },
 
   /**
+   * Submit analyst feedback (corrected verdict) for self-learning
+   */
+  async submitScanFeedback(
+    scanId: string,
+    data: { correctedVerdict: "AUTHENTIC" | "DEEPFAKE" | "SUSPICIOUS"; notes?: string }
+  ): Promise<{
+    success: boolean
+    message: string
+    data: { scanId: string; feedback: ScanFeedback }
+  }> {
+    return authenticatedRequest(`/scans/${scanId}/feedback`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+  },
+
+  /**
    * Export scan as PDF
    */
   async exportScanPDF(scanId: string): Promise<Blob> {
@@ -719,6 +744,20 @@ export const apiService = {
     }
   }> {
     return authenticatedRequest(`/admin/ml/config`)
+  },
+
+  /**
+   * Admin: Get feedback stats for self-learning retraining
+   */
+  async getFeedbackStats(): Promise<{
+    success: boolean
+    data: {
+      feedbackCount: number
+      minForRetraining: number
+      readyForRetraining: boolean
+    }
+  }> {
+    return authenticatedRequest(`/admin/feedback/stats`)
   },
 
   /**

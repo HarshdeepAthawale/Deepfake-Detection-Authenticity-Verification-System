@@ -9,6 +9,7 @@ import logger from '../utils/logger.js';
 import { getMLServiceStatus, checkMLServiceHealth } from '../ml/ml-client.js';
 import mlConfig from '../config/ml.config.js';
 import { cached, makeKey } from '../utils/cache.js';
+import { getFeedbackCount } from '../scans/scan.service.js';
 
 /**
  * Get system-wide statistics
@@ -193,9 +194,34 @@ export const getMLConfigEndpoint = async (req, res) => {
   }
 };
 
+/**
+ * Get feedback statistics for self-learning retraining eligibility
+ * GET /api/admin/feedback/stats
+ */
+export const getFeedbackStats = async (req, res) => {
+  try {
+    const count = await getFeedbackCount(req.user?.role || 'operative');
+    res.status(200).json({
+      success: true,
+      data: {
+        feedbackCount: count,
+        minForRetraining: 50,
+        readyForRetraining: count >= 50,
+      },
+    });
+  } catch (error) {
+    logger.error('Get feedback stats error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch feedback statistics',
+      message: error.message,
+    });
+  }
+};
+
 export default {
   getAdminStats,
   getMLHealth,
   getMLConfigEndpoint,
+  getFeedbackStats,
 };
 
