@@ -90,7 +90,11 @@
 
 **AI/ML Features (System Context):** SENTINEL includes an AI/ML detection pipeline that analyzes uploaded media (images, video, audio) for deepfakes. The pipeline uses a SiglIP-based classifier with **94.44% accuracy** and produces risk scores and verdicts (DEEPFAKE / SUSPICIOUS / AUTHENTIC). All detection outputs—risk score, confidence, verdict, and model version—are persisted in the database (Scans and VerdictTypes tables).
 
-**4-Agent Pipeline:** Media passes through four agents in sequence: (1) **Perception Agent**—extracts frames, metadata, and file hash; (2) **Detection Agent**—invokes the ML model and aggregates risk scores; (3) **Compression Agent**—analyzes quality and compression artifacts to adjust scores; (4) **Cognitive Agent**—produces the final verdict and human-readable explanation.
+**4-Agent Pipeline:** Media passes through four agents in sequence: 
+(1) **Perception Agent**—extracts frames, metadata, and file hash; 
+(2) **Detection Agent**—invokes the ML model and aggregates risk scores; 
+(3) **Compression Agent**—analyzes quality and compression artifacts to adjust scores; 
+(4) **Cognitive Agent**—produces the final verdict and human-readable explanation.
 
 **Analytics:** The database enables analytics via SQL queries and views—scan counts by verdict, average risk score, trends by date/media type, and analyst dashboards. Stored procedures and cursors support report generation (PDF, JSON, CSV) for forensic and compliance use. The DBMS layer thus supports the AI/ML workflow by storing and querying verification results reliably.
 
