@@ -1,5 +1,5 @@
 # PROJECT SYNOPSIS
-## ON
+
 # SENTINEL – Deepfake Detection & Authenticity Verification System
 
 **Project Title:** SENTINEL – Deepfake Detection & Authenticity Verification System  
