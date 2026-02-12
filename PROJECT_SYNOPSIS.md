@@ -125,53 +125,53 @@
 ```mermaid
 erDiagram
     User {
-        UserID PK
-        Name string
-        Email string
-        Role string
-        PasswordHash string
-        OperativeID FK
-        CreatedAt datetime
+        string UserID PK
+        string Name
+        string Email
+        string Role
+        string PasswordHash
+        string OperativeID FK
+        string CreatedAt
     }
     Scan {
-        ScanID PK
-        UserID FK
-        FileHash string
-        MediaType string
-        Status string
-        RiskScore float
-        Confidence float
-        VerdictID FK
-        ModelVersion string
-        CreatedAt datetime
+        string ScanID PK
+        string UserID FK
+        string FileHash
+        string MediaType
+        string Status
+        number RiskScore
+        number Confidence
+        string VerdictID FK
+        string ModelVersion
+        string CreatedAt
     }
     AuditLog {
-        AuditID PK
-        UserID FK
-        Action string
-        Resource string
-        Timestamp datetime
+        string AuditID PK
+        string UserID FK
+        string Action
+        string Resource
+        string Timestamp
     }
     Notification {
-        NotificationID PK
-        UserID FK
-        Type string
-        Message string
-        IsRead boolean
-        Timestamp datetime
+        string NotificationID PK
+        string UserID FK
+        string Type
+        string Message
+        string IsRead
+        string Timestamp
     }
     EvidenceVault {
-        EvidenceID PK
-        ScanID FK
-        FilePath string
-        SHA256Hash string
-        CreatedAt datetime
+        string EvidenceID PK
+        string ScanID FK
+        string FilePath
+        string SHA256Hash
+        string CreatedAt
     }
     VerdictType {
-        VerdictID PK
-        VerdictName string
-        RiskMin float
-        RiskMax float
+        string VerdictID PK
+        string VerdictName
+        number RiskMin
+        number RiskMax
     }
     User ||--o{ Scan : creates
     User ||--o{ AuditLog : has
