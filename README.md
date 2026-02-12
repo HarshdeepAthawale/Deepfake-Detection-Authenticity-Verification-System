@@ -9,7 +9,6 @@ A full-stack AI-powered platform for detecting deepfake media using machine lear
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
 - [Installation](#installation)
-- [Configuration](#configuration)
 - [API Reference](#api-reference)
 - [Agentic AI Pipeline](#agentic-ai-pipeline)
 - [ML Model](#ml-model)
@@ -219,33 +218,6 @@ sudo apt-get install ffmpeg
 ```bash
 choco install ffmpeg
 ```
-
----
-
-## Configuration
-
-### Environment Setup
-
-1. Copy the environment template: `cp .env.example .env`
-2. Generate required secrets using the commands below and add them to your `.env` file.
-3. Update other values (MongoDB URI, URLs, etc.) as needed for your environment.
-
-### Generate Secrets
-
-**Required** — Generate these secrets and set them in your `.env` file:
-
-```bash
-# Generate JWT_SECRET
-openssl rand -base64 32
-
-# Generate ENCRYPTION_KEY (32 characters)
-openssl rand -base64 32 | cut -c1-32
-
-# Generate ENCRYPTION_IV (16 characters)
-openssl rand -base64 16 | cut -c1-16
-```
-
-See `.env.example` for the full list of environment variables.
 
 ---
 
