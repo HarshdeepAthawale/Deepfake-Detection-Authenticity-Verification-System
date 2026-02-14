@@ -19,6 +19,7 @@ import reportRoutes from './reports/report.routes.js';
 import auditRoutes from './audit/audit.routes.js';
 import notificationRoutes from './notifications/notification.routes.js';
 import caseRoutes from './cases/case.routes.js';
+import learningRoutes from './learning/learning.routes.js';
 
 const app = express();
 
@@ -116,6 +117,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/scans', scanRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/learning', learningRoutes);
 app.use('/api/admin/audit', auditRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/cases', caseRoutes);

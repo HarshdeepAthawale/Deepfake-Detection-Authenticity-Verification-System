@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { TacticalShell } from "@/components/tactical-shell"
 import { AdminProtectedRoute } from "@/components/admin-protected-route"
 import { apiService } from "@/lib/api"
-import { Brain, Activity, Server, Settings, AlertCircle, CheckCircle2, XCircle, RotateCcw } from "lucide-react"
+import { Brain, Activity, Server, Settings, AlertCircle, CheckCircle2, XCircle, RotateCcw, Zap, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -32,12 +32,37 @@ interface FeedbackStats {
   readyForRetraining: boolean
 }
 
+interface LearningStatus {
+  feedbackSinceLastCycle: number
+  totalFeedback: number
+  minFeedbackThreshold: number
+  readyForCycle: boolean
+  lastCycle: {
+    id: string
+    status: string
+    triggeredBy: string
+    startedAt: string
+    completedAt?: string
+    agents: Record<string, { status: string; error?: string; paramsUpdated?: boolean }>
+  } | null
+  lastTraining: {
+    version: string
+    status: string
+    metrics?: Record<string, number>
+    completedAt?: string
+  } | null
+  agentParams: Record<string, { params: any; version: number; lastUpdated: string }>
+}
+
 export default function MLConfigPage() {
   const [health, setHealth] = useState<MLHealth | null>(null)
   const [config, setConfig] = useState<MLConfig | null>(null)
   const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null)
+  const [learningStatus, setLearningStatus] = useState<LearningStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [triggering, setTriggering] = useState(false)
+  const [triggerResult, setTriggerResult] = useState<string | null>(null)
 
   useEffect(() => {
     loadMLData()
@@ -46,10 +71,11 @@ export default function MLConfigPage() {
   const loadMLData = async () => {
     try {
       setLoading(true)
-      const [healthResponse, configResponse, feedbackResponse] = await Promise.all([
+      const [healthResponse, configResponse, feedbackResponse, learningResponse] = await Promise.all([
         apiService.getMLHealth(),
         apiService.getMLConfig(),
         apiService.getFeedbackStats(),
+        apiService.getLearningStatus().catch(() => ({ success: false })),
       ])
 
       if (healthResponse.success) {
@@ -61,10 +87,31 @@ export default function MLConfigPage() {
       if (feedbackResponse.success) {
         setFeedbackStats(feedbackResponse.data)
       }
+      if (learningResponse.success && learningResponse.data) {
+        setLearningStatus(learningResponse.data)
+      }
     } catch (error) {
       console.error("Failed to load ML data:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleTriggerLearning = async () => {
+    try {
+      setTriggering(true)
+      setTriggerResult(null)
+      const res = await apiService.triggerLearningCycle()
+      if (res.success) {
+        setTriggerResult(`Cycle ${res.data.status}: ${JSON.stringify(res.data.results)}`)
+        await loadMLData()
+      } else {
+        setTriggerResult("Trigger failed")
+      }
+    } catch (error) {
+      setTriggerResult(error instanceof Error ? error.message : "Trigger failed")
+    } finally {
+      setTriggering(false)
     }
   }
 
@@ -157,6 +204,94 @@ export default function MLConfigPage() {
                   </div>
                 )}
               </div>
+
+              {/* Self-Learning: Learning Cycle Status & Control */}
+              {learningStatus && (
+                <div className="bg-card/30 border border-primary/10 rounded-sm p-6 backdrop-blur-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-sm font-bold text-primary border-b border-primary/10 pb-2 uppercase tracking-tighter flex items-center gap-2">
+                      <Zap size={14} />
+                      SELF_LEARNING_CYCLE
+                    </h2>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTriggerLearning}
+                      disabled={triggering}
+                      className="border-primary/20 bg-transparent text-primary text-[10px] font-bold h-8"
+                    >
+                      {triggering ? <Loader2 size={12} className="animate-spin mr-1" /> : <Zap size={12} className="mr-1" />}
+                      {triggering ? "RUNNING..." : "TRIGGER CYCLE"}
+                    </Button>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <div className="text-[10px] font-mono text-muted-foreground uppercase mb-1">SINCE_LAST_CYCLE</div>
+                        <div className="text-lg font-bold font-mono text-primary">{learningStatus.feedbackSinceLastCycle}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-mono text-muted-foreground uppercase mb-1">TOTAL_FEEDBACK</div>
+                        <div className="text-lg font-bold font-mono">{learningStatus.totalFeedback}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-mono text-muted-foreground uppercase mb-1">THRESHOLD</div>
+                        <div className="text-lg font-bold font-mono">{learningStatus.minFeedbackThreshold}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-mono text-muted-foreground uppercase mb-1">READY</div>
+                        <div className={cn(
+                          "text-lg font-bold font-mono",
+                          learningStatus.readyForCycle ? "text-success" : "text-muted-foreground"
+                        )}>
+                          {learningStatus.readyForCycle ? "YES" : "NO"}
+                        </div>
+                      </div>
+                    </div>
+                    {learningStatus.lastCycle && (
+                      <div className="p-3 rounded border border-primary/20 bg-background/30">
+                        <div className="text-[10px] font-mono text-muted-foreground uppercase mb-2">LAST_CYCLE</div>
+                        <div className="text-xs font-mono">
+                          Status: <span className={cn(
+                            "font-bold",
+                            learningStatus.lastCycle.status === "completed" ? "text-success" :
+                            learningStatus.lastCycle.status === "failed" ? "text-destructive" : "text-primary"
+                          )}>{learningStatus.lastCycle.status}</span>
+                          {" · "}Triggered by: {learningStatus.lastCycle.triggeredBy}
+                          {" · "}{new Date(learningStatus.lastCycle.startedAt).toLocaleString()}
+                        </div>
+                        {Object.entries(learningStatus.lastCycle.agents).length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {Object.entries(learningStatus.lastCycle.agents).map(([agent, info]) => (
+                              <span key={agent} className={cn(
+                                "text-[9px] font-mono px-2 py-0.5 rounded",
+                                info.status === "completed" ? "bg-success/20 text-success" :
+                                info.status === "failed" ? "bg-destructive/20 text-destructive" :
+                                "bg-primary/10 text-primary"
+                              )}>
+                                {agent}: {info.status}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {learningStatus.lastTraining && (
+                      <div className="text-[10px] font-mono text-muted-foreground">
+                        Last model training: v{learningStatus.lastTraining.version} ({learningStatus.lastTraining.status})
+                        {learningStatus.lastTraining.metrics?.accuracy != null && (
+                          <span> · Val accuracy: {(Number(learningStatus.lastTraining.metrics.accuracy) * 100).toFixed(1)}%</span>
+                        )}
+                      </div>
+                    )}
+                    {triggerResult && (
+                      <div className="text-[10px] font-mono p-3 rounded bg-primary/10 border border-primary/20 text-primary break-all">
+                        {triggerResult}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Self-Learning Feedback Stats */}
               {feedbackStats && (

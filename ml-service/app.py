@@ -22,8 +22,11 @@ from datetime import datetime
 # Import our modules
 from model_loader import (
     get_pipeline, is_model_loaded, load_model, get_model_info,
-    get_audio_pipeline, is_audio_model_loaded, load_audio_model
+    get_audio_pipeline, is_audio_model_loaded, load_audio_model,
+    hot_swap_model
 )
+from trainer import start_training, get_training_status
+from dataset_builder import get_dataset_stats
 from preprocessing import preprocess_image, preprocess_frames
 from audio_preprocessing import preprocess_audio, is_audio_processing_available
 
@@ -571,6 +574,55 @@ def inference():
             'error': 'Inference failed',
             'message': str(e)
         }), 500
+
+
+@app.route('/api/v1/retrain', methods=['POST'])
+def retrain():
+    """Trigger model retraining in background thread"""
+    try:
+        # Check dataset availability first
+        stats = get_dataset_stats()
+        if stats['total'] < 10:
+            return jsonify({
+                'error': 'Insufficient data',
+                'message': f'Need at least 10 samples, have {stats["total"]}',
+                'dataset': stats,
+            }), 400
+
+        result = start_training()
+
+        if result['status'] == 'already_training':
+            return jsonify({
+                'status': 'already_training',
+                'message': 'Training is already in progress',
+                'training_status': get_training_status(),
+            }), 409
+
+        return jsonify({
+            'status': 'started',
+            'version': result['version'],
+            'dataset': stats,
+            'message': 'Fine-tuning started in background',
+        }), 202
+
+    except Exception as e:
+        logger.error(f'[ML_SERVICE] Retrain error: {str(e)}', exc_info=True)
+        return jsonify({'error': 'Retrain failed', 'message': str(e)}), 500
+
+
+@app.route('/api/v1/training/status', methods=['GET'])
+def training_status():
+    """Get current training progress"""
+    try:
+        status = get_training_status()
+        dataset = get_dataset_stats()
+        return jsonify({
+            'training': status,
+            'dataset': dataset,
+        }), 200
+    except Exception as e:
+        logger.error(f'[ML_SERVICE] Training status error: {str(e)}')
+        return jsonify({'error': str(e)}), 500
 
 
 @app.errorhandler(404)

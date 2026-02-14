@@ -18,6 +18,9 @@ RUN pip install --upgrade pip && \
 # Copy application code
 COPY . .
 
+# Create checkpoints directory for model fine-tuning
+RUN mkdir -p /app/checkpoints
+
 # Model will be mounted as volume at /app/model
 # If not present, it will be downloaded from HuggingFace on first run
 

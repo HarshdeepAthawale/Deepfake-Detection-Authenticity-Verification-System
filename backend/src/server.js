@@ -86,6 +86,16 @@ const startServer = async () => {
       logger.warn('[SERVER] Batch processing will use direct processing as fallback.');
     }
 
+    // Initialize learning scheduler (optional - gracefully handles if Redis unavailable)
+    try {
+      const { initializeLearningScheduler } = await import('./learning/learning.scheduler.js');
+      await initializeLearningScheduler();
+      logger.info('[SERVER] Learning scheduler initialized');
+    } catch (error) {
+      logger.warn('[SERVER] Failed to initialize learning scheduler:', error.message);
+      logger.warn('[SERVER] Self-learning will not run automatically.');
+    }
+
     // Initialize ML service health checks (optional - gracefully handles if ML service unavailable)
     try {
       startHealthChecks();

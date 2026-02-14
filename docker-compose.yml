@@ -98,8 +98,12 @@ services:
       - "5001:5000"
     environment:
       PORT: 5000
+      TRAINING_DATASET_PATH: /app/uploads/training_dataset
+      CHECKPOINT_DIR: /app/checkpoints
+      TRAINING_CALLBACK_URL: http://backend:3001/api/admin/learning/training-complete
     volumes:
       - uploads:/app/uploads
+      - ml-checkpoints:/app/checkpoints
       - ./ml-service/model:/app/model # Mount model directory
     networks:
       - deepfake-network
@@ -159,7 +163,8 @@ volumes:
   mongo-data:
   mongodb_config:
   redis-data:
-  uploads: # Shared volume for uploads between backend and ML service
+  uploads: # Shared volume for uploads between backend and ML service (includes training_dataset)
+  ml-checkpoints: # ML model checkpoints for fine-tuning
   backend_logs:
 
 
