@@ -5,6 +5,7 @@
  */
 
 import logger from '../utils/logger.js';
+import { getCognitiveParams } from '../learning/adaptive-cognitive.js';
 
 /**
  * Calculate dynamic thresholds based on context
@@ -12,38 +13,49 @@ import logger from '../utils/logger.js';
  * @param {Object} detectionResults - Detection scores
  * @returns {Object} Adjusted thresholds
  */
-const calculateDynamicThresholds = (perceptionData, detectionResults) => {
-  let deepfakeThreshold = 75;
-  let suspiciousThreshold = 40;
+const calculateDynamicThresholds = async (perceptionData, detectionResults) => {
+  // Load learned base thresholds (fallback to hardcoded defaults)
+  let baseDeepfake = 75;
+  let baseSuspicious = 40;
+  let adj = { lowBitrateIncrease: 5, highUncertaintyDeepfake: 10, highUncertaintySuspicious: 5, imageDecrease: 5, multiFrameDecrease: 5 };
+
+  try {
+    const learned = await getCognitiveParams();
+    baseDeepfake = learned.deepfakeThreshold ?? 75;
+    baseSuspicious = learned.suspiciousThreshold ?? 40;
+    adj = learned.adjustments ?? adj;
+    logger.info(`[COGNITIVE_AGENT] Using learned base thresholds: deepfake=${baseDeepfake}, suspicious=${baseSuspicious}`);
+  } catch {
+    // Use hardcoded defaults
+  }
+
+  let deepfakeThreshold = baseDeepfake;
+  let suspiciousThreshold = baseSuspicious;
 
   // Adjust for media quality
   const bitrate = perceptionData.metadata?.bitrate || 0;
   if (bitrate > 0 && bitrate < 2000000) {
-    // Low quality media - be more lenient
-    deepfakeThreshold += 5;
-    suspiciousThreshold += 5;
+    deepfakeThreshold += adj.lowBitrateIncrease;
+    suspiciousThreshold += adj.lowBitrateIncrease;
   }
 
   // Adjust for uncertainty
   const uncertainty = detectionResults.uncertainty || 0;
   if (uncertainty > 20) {
-    // High uncertainty - require higher confidence
-    deepfakeThreshold += 10;
-    suspiciousThreshold += 5;
+    deepfakeThreshold += adj.highUncertaintyDeepfake;
+    suspiciousThreshold += adj.highUncertaintySuspicious;
   }
 
   // Adjust for media type
   if (perceptionData.mediaType === 'IMAGE') {
-    // Images are easier to analyze - be stricter
-    deepfakeThreshold -= 5;
+    deepfakeThreshold -= adj.imageDecrease;
   } else if (perceptionData.mediaType === 'VIDEO' && detectionResults.frameCount > 10) {
-    // Many frames analyzed - higher confidence
-    deepfakeThreshold -= 5;
+    deepfakeThreshold -= adj.multiFrameDecrease;
   }
 
   return {
-    deepfakeThreshold: Math.max(60, Math.min(85, deepfakeThreshold)),
-    suspiciousThreshold: Math.max(30, Math.min(50, suspiciousThreshold)),
+    deepfakeThreshold: Math.max(55, Math.min(90, deepfakeThreshold)),
+    suspiciousThreshold: Math.max(25, Math.min(55, suspiciousThreshold)),
   };
 };
 
@@ -227,8 +239,8 @@ export const generateExplanations = async (detectionResults, perceptionData) => 
     const peakRisk = detectionResults.peakRisk || 0;
     const meanRisk = detectionResults.meanRisk || 0;
 
-    // Calculate dynamic thresholds
-    const thresholds = calculateDynamicThresholds(perceptionData, detectionResults);
+    // Calculate dynamic thresholds (async - loads learned params)
+    const thresholds = await calculateDynamicThresholds(perceptionData, detectionResults);
 
     // Generate rich explanations
     const richExplanations = generateRichExplanations(detectionResults, perceptionData);

@@ -761,6 +761,83 @@ export const apiService = {
   },
 
   /**
+   * Admin: Get learning system status and agent params
+   */
+  async getLearningStatus(): Promise<{
+    success: boolean
+    data: {
+      feedbackSinceLastCycle: number
+      totalFeedback: number
+      minFeedbackThreshold: number
+      readyForCycle: boolean
+      lastCycle: {
+        id: string
+        status: string
+        triggeredBy: string
+        startedAt: string
+        completedAt?: string
+        agents: Record<string, { status: string; error?: string; paramsUpdated?: boolean }>
+      } | null
+      lastTraining: {
+        version: string
+        status: string
+        metrics?: Record<string, number>
+        completedAt?: string
+      } | null
+      agentParams: Record<string, { params: any; version: number; lastUpdated: string }>
+    }
+  }> {
+    return authenticatedRequest(`/admin/learning/status`)
+  },
+
+  /**
+   * Admin: Manually trigger learning cycle
+   */
+  async triggerLearningCycle(): Promise<{
+    success: boolean
+    data: {
+      cycleId: string
+      status: string
+      feedbackCount: number
+      results: Record<string, { status: string; error?: string; updated?: boolean }>
+    }
+    message: string
+  }> {
+    return authenticatedRequest(`/admin/learning/trigger`, {
+      method: "POST",
+    })
+  },
+
+  /**
+   * Admin: Get learning cycle history (paginated)
+   */
+  async getLearningHistory(
+    page: number = 1,
+    limit: number = 20
+  ): Promise<{
+    success: boolean
+    data: {
+      cycles: Array<{
+        _id: string
+        triggeredBy: string
+        status: string
+        startedAt: string
+        completedAt?: string
+        feedbackCount: number
+        agents: Record<string, any>
+      }>
+      pagination: {
+        page: number
+        limit: number
+        total: number
+        pages: number
+      }
+    }
+  }> {
+    return authenticatedRequest(`/admin/learning/history?page=${page}&limit=${limit}`)
+  },
+
+  /**
    * Analytics: Get analytics overview
    */
   async getAnalyticsOverview(): Promise<{

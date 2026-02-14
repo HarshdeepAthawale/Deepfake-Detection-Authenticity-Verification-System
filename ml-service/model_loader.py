@@ -25,6 +25,8 @@ _pipeline = None
 _audio_pipeline = None
 _device = None
 _audio_model_loaded = False
+_current_version = 'v1.0.0'
+_model_lock = __import__('threading').Lock()
 
 
 def get_device():
@@ -101,6 +103,47 @@ def is_model_loaded():
     return _pipeline is not None
 
 
+def hot_swap_model(new_model_path):
+    """
+    Atomically replace the global image pipeline with a newly fine-tuned model.
+
+    Args:
+        new_model_path: Path to the fine-tuned model directory
+
+    Returns:
+        New model version string
+    """
+    global _pipeline, _current_version
+
+    logger.info(f'[MODEL_LOADER] Hot-swapping model from: {new_model_path}')
+
+    try:
+        device = get_device()
+
+        new_pipeline = pipeline(
+            "image-classification",
+            model=new_model_path,
+            device=device
+        )
+
+        # Atomic swap
+        with _model_lock:
+            old_pipeline = _pipeline
+            _pipeline = new_pipeline
+            # Version from directory name or timestamp
+            _current_version = os.path.basename(os.path.dirname(new_model_path)) or _current_version
+
+        # Let old pipeline get garbage collected
+        del old_pipeline
+
+        logger.info(f'[MODEL_LOADER] Model hot-swapped successfully. Version: {_current_version}')
+        return _current_version
+
+    except Exception as e:
+        logger.error(f'[MODEL_LOADER] Hot-swap failed: {str(e)}', exc_info=True)
+        raise
+
+
 def load_audio_model():
     """
     Load the audio deepfake detection model (wav2vec2-based)
@@ -173,7 +216,7 @@ def get_model_info():
         # Image model info
         'model': model_source,
         'model_name': 'deepfake-detector-model-v1',
-        'model_version': 'v1.0.0',
+        'model_version': _current_version,
         'model_id': MODEL_ID_HF,
         'model_loaded': _pipeline is not None,
         'device': 'cuda' if get_device() >= 0 else 'cpu',

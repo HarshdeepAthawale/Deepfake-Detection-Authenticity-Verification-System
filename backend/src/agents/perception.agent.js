@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import { generateFileHash } from '../security/encryption.js';
 import { extractFrames, extractAudio, getMediaMetadata, normalizeMedia, extractGPSFromImage } from '../utils/ffmpeg.js';
 import logger from '../utils/logger.js';
+import { getPerceptionParams } from '../learning/adaptive-perception.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -98,29 +99,33 @@ export const processMedia = async (filePath, scanId) => {
       try {
         const framesDir = path.join(processingDir, 'frames');
         
-        // Adaptive frame sampling based on video duration
+        // Adaptive frame sampling based on video duration (uses learned params if available)
         const duration = perceptionResults.duration || 0;
         let frameRate = 4; // Default 4 fps
         let maxFrames = 60; // Default max 60 frames
-        
-        if (duration <= 10) {
-          // Short videos (≤10s): 4 fps, max 40 frames
-          frameRate = 4;
-          maxFrames = 40;
-        } else if (duration <= 30) {
-          // Medium videos (≤30s): 3 fps, max 90 frames
-          frameRate = 3;
-          maxFrames = 90;
-        } else if (duration <= 60) {
-          // Long videos (≤60s): 2 fps, max 120 frames
-          frameRate = 2;
-          maxFrames = 120;
-        } else {
-          // Very long videos (>60s): 1 fps, max 120 frames
-          frameRate = 1;
-          maxFrames = 120;
+
+        try {
+          const learnedParams = await getPerceptionParams();
+          const buckets = learnedParams.durationBuckets;
+          const bucket = buckets.find(b => duration <= b.maxDuration);
+          if (bucket) {
+            frameRate = bucket.frameRate;
+            maxFrames = bucket.maxFrames;
+            logger.info(`[PERCEPTION_AGENT] Using learned sampling params for duration=${duration}s`);
+          }
+        } catch {
+          // Fallback to hardcoded defaults
+          if (duration <= 10) {
+            frameRate = 4; maxFrames = 40;
+          } else if (duration <= 30) {
+            frameRate = 3; maxFrames = 90;
+          } else if (duration <= 60) {
+            frameRate = 2; maxFrames = 120;
+          } else {
+            frameRate = 1; maxFrames = 120;
+          }
         }
-        
+
         logger.info(`[PERCEPTION_AGENT] Adaptive sampling: duration=${duration}s, fps=${frameRate}, maxFrames=${maxFrames}`);
         
         const frames = await extractFrames(filePath, framesDir, frameRate, maxFrames);
