@@ -671,8 +671,8 @@ docker-compose logs ml-service
 ---
 
 ## License
-
-MIT License - see [LICENSE](LICENSE) for details.
+This project is proprietary. All rights reserved.
+See the LICENSE file for details.
 
 ---
 
