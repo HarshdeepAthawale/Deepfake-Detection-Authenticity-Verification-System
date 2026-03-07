@@ -69,6 +69,7 @@ uploads/
 # IDE
 .vscode/
 .idea/
+.cursor/plans
 *.swp
 *.swo
 *~
