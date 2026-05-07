@@ -50,7 +50,10 @@ export function TacticalShell({
           <NavItem icon={<Terminal size={18} />} label="Media Scanner" active={activeTab === "scanner"} href="/scanner" />
           <NavItem icon={<Lock size={18} />} label="Evidence Vault" active={activeTab === "vault"} href="/vault" />
           {(user?.role === "admin" || user?.role === "analyst") && (
-            <NavItem icon={<BarChart3 size={18} />} label="Analytics" active={activeTab === "analytics"} href="/analytics" />
+            <>
+              <NavItem icon={<BarChart3 size={18} />} label="Analytics" active={activeTab === "analytics"} href="/analytics" />
+              <NavItem icon={<Activity size={18} />} label="Audit Log" active={activeTab === "audit"} href="/audit" />
+            </>
           )}
           {user?.role === "admin" && (
             <NavItem icon={<Settings size={18} />} label="Admin Panel" active={activeTab === "admin"} href="/admin" />

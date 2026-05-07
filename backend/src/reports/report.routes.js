@@ -15,34 +15,34 @@ router.use(authenticate);
 
 /**
  * @route   GET /api/reports/scans/:id/pdf
- * @desc    Export single scan as PDF
- * @access  Private (requires scan:view permission)
+ * @desc    Export single scan as PDF report
+ * @access  Private (requires report:generate permission)
  */
 router.get(
   '/scans/:id/pdf',
-  requirePermission(PERMISSIONS.SCAN_VIEW),
+  requirePermission(PERMISSIONS.REPORT_GENERATE),
   exportScanPDF
 );
 
 /**
  * @route   GET /api/reports/scans/:id/json
- * @desc    Export single scan as JSON
- * @access  Private (requires scan:view permission)
+ * @desc    Export single scan as JSON report
+ * @access  Private (requires report:generate permission)
  */
 router.get(
   '/scans/:id/json',
-  requirePermission(PERMISSIONS.SCAN_VIEW),
+  requirePermission(PERMISSIONS.REPORT_GENERATE),
   exportScanJSON
 );
 
 /**
  * @route   GET /api/reports/scans/csv
- * @desc    Export multiple scans as CSV
- * @access  Private (requires scan:view permission)
+ * @desc    Export multiple scans as CSV (bulk export)
+ * @access  Private (requires scan:export permission)
  */
 router.get(
   '/scans/csv',
-  requirePermission(PERMISSIONS.SCAN_VIEW),
+  requirePermission(PERMISSIONS.SCAN_EXPORT),
   exportScansCSV
 );
 

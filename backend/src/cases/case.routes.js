@@ -22,36 +22,36 @@ router.use(authenticate);
 /**
  * @route   POST /api/cases
  * @desc    Create a new case
- * @access  Private
+ * @access  Private (requires case:create permission)
  */
-router.post('/', createCaseHandler);
+router.post('/', requirePermission(PERMISSIONS.CASE_CREATE), createCaseHandler);
 
 /**
  * @route   GET /api/cases
  * @desc    Get cases with filtering
- * @access  Private
+ * @access  Private (requires case:view permission)
  */
-router.get('/', getCasesHandler);
+router.get('/', requirePermission(PERMISSIONS.CASE_VIEW), getCasesHandler);
 
 /**
  * @route   GET /api/cases/:id
  * @desc    Get case by ID
- * @access  Private
+ * @access  Private (requires case:view permission)
  */
-router.get('/:id', getCaseHandler);
+router.get('/:id', requirePermission(PERMISSIONS.CASE_VIEW), getCaseHandler);
 
 /**
  * @route   PUT /api/cases/:id
  * @desc    Update case
- * @access  Private
+ * @access  Private (requires case:edit permission)
  */
-router.put('/:id', updateCaseHandler);
+router.put('/:id', requirePermission(PERMISSIONS.CASE_EDIT), updateCaseHandler);
 
 /**
  * @route   DELETE /api/cases/:id
- * @desc    Delete case (admin only)
- * @access  Private (requires system:admin permission)
+ * @desc    Delete case
+ * @access  Private (requires case:delete permission)
  */
-router.delete('/:id', requirePermission(PERMISSIONS.SYSTEM_ADMIN), deleteCaseHandler);
+router.delete('/:id', requirePermission(PERMISSIONS.CASE_DELETE), deleteCaseHandler);
 
 export default router;

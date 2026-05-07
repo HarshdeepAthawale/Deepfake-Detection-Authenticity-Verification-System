@@ -14,17 +14,42 @@ export const PERMISSIONS = {
   SCAN_UPLOAD: 'scan:upload',
   SCAN_VIEW: 'scan:view',
   SCAN_VIEW_ALL: 'scan:view:all',
+  SCAN_EDIT: 'scan:edit',
   SCAN_DELETE: 'scan:delete',
   SCAN_EXPORT: 'scan:export',
-  
+  SCAN_ASSIGN: 'scan:assign',
+  SCAN_ANNOTATE: 'scan:annotate',
+
   // User permissions
   USER_CREATE: 'user:create',
   USER_VIEW: 'user:view',
   USER_EDIT: 'user:edit',
   USER_DELETE: 'user:delete',
-  
+  USER_ACTIVITY_VIEW: 'user:activity',
+
+  // Case permissions
+  CASE_CREATE: 'case:create',
+  CASE_VIEW: 'case:view',
+  CASE_EDIT: 'case:edit',
+  CASE_ASSIGN: 'case:assign',
+  CASE_DELETE: 'case:delete',
+
+  // Report permissions
+  REPORT_GENERATE: 'report:generate',
+
+  // Evidence permissions
+  EVIDENCE_VIEW_ALL: 'evidence:view:all',
+  EVIDENCE_MANAGE: 'evidence:manage',
+
+  // Audit permissions
+  AUDIT_VIEW: 'audit:view',
+
+  // Session permissions
+  SESSION_MANAGE: 'session:manage',
+
   // System permissions
   SYSTEM_ADMIN: 'system:admin',
+  SYSTEM_CONFIG: 'system:config',
   SYSTEM_EXPORT_ALL: 'system:export:all',
   VIEW_ANALYTICS: 'view:analytics',
 };
@@ -34,16 +59,39 @@ export const PERMISSIONS = {
  */
 const ROLE_PERMISSIONS = {
   [ROLES.ADMIN]: [
+    // Scan permissions
     PERMISSIONS.SCAN_UPLOAD,
     PERMISSIONS.SCAN_VIEW,
     PERMISSIONS.SCAN_VIEW_ALL,
+    PERMISSIONS.SCAN_EDIT,
     PERMISSIONS.SCAN_DELETE,
     PERMISSIONS.SCAN_EXPORT,
+    PERMISSIONS.SCAN_ASSIGN,
+    PERMISSIONS.SCAN_ANNOTATE,
+    // User permissions
     PERMISSIONS.USER_CREATE,
     PERMISSIONS.USER_VIEW,
     PERMISSIONS.USER_EDIT,
     PERMISSIONS.USER_DELETE,
+    PERMISSIONS.USER_ACTIVITY_VIEW,
+    // Case permissions
+    PERMISSIONS.CASE_CREATE,
+    PERMISSIONS.CASE_VIEW,
+    PERMISSIONS.CASE_EDIT,
+    PERMISSIONS.CASE_ASSIGN,
+    PERMISSIONS.CASE_DELETE,
+    // Report permissions
+    PERMISSIONS.REPORT_GENERATE,
+    // Evidence permissions
+    PERMISSIONS.EVIDENCE_VIEW_ALL,
+    PERMISSIONS.EVIDENCE_MANAGE,
+    // Audit permissions
+    PERMISSIONS.AUDIT_VIEW,
+    // Session permissions
+    PERMISSIONS.SESSION_MANAGE,
+    // System permissions
     PERMISSIONS.SYSTEM_ADMIN,
+    PERMISSIONS.SYSTEM_CONFIG,
     PERMISSIONS.SYSTEM_EXPORT_ALL,
     PERMISSIONS.VIEW_ANALYTICS,
   ],
@@ -53,9 +101,25 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.SCAN_EXPORT,
   ],
   [ROLES.ANALYST]: [
+    // Scan permissions
     PERMISSIONS.SCAN_VIEW,
     PERMISSIONS.SCAN_VIEW_ALL,
+    PERMISSIONS.SCAN_EDIT,
     PERMISSIONS.SCAN_EXPORT,
+    PERMISSIONS.SCAN_ASSIGN,
+    PERMISSIONS.SCAN_ANNOTATE,
+    // Case permissions
+    PERMISSIONS.CASE_CREATE,
+    PERMISSIONS.CASE_VIEW,
+    PERMISSIONS.CASE_EDIT,
+    PERMISSIONS.CASE_ASSIGN,
+    // Report permissions
+    PERMISSIONS.REPORT_GENERATE,
+    // Evidence permissions
+    PERMISSIONS.EVIDENCE_VIEW_ALL,
+    // Audit permissions
+    PERMISSIONS.AUDIT_VIEW,
+    // Analytics
     PERMISSIONS.VIEW_ANALYTICS,
   ],
 };
