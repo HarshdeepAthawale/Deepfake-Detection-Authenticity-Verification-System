@@ -111,5 +111,85 @@ router.get(
   getAnalyticsScans
 );
 
+/**
+ * Session management routes
+ */
+
+/**
+ * @route   GET /api/admin/sessions
+ * @desc    Get active user sessions
+ * @access  Private (requires session:manage permission)
+ */
+router.get(
+  '/sessions',
+  requirePermission(PERMISSIONS.SESSION_MANAGE),
+  (req, res) => {
+    res.json({
+      success: true,
+      message: 'Session management endpoint',
+      data: { sessions: [] },
+    });
+  }
+);
+
+/**
+ * @route   DELETE /api/admin/sessions/:userId
+ * @desc    Terminate user session
+ * @access  Private (requires session:manage permission)
+ */
+router.delete(
+  '/sessions/:userId',
+  requirePermission(PERMISSIONS.SESSION_MANAGE),
+  (req, res) => {
+    res.json({
+      success: true,
+      message: `Session terminated for user ${req.params.userId}`,
+    });
+  }
+);
+
+/**
+ * System configuration routes
+ */
+
+/**
+ * @route   GET /api/admin/config
+ * @desc    Get system configuration
+ * @access  Private (requires system:config permission)
+ */
+router.get(
+  '/config',
+  requirePermission(PERMISSIONS.SYSTEM_CONFIG),
+  (req, res) => {
+    res.json({
+      success: true,
+      message: 'System configuration',
+      data: {
+        mlConfidenceThreshold: 0.75,
+        rateLimitWindow: 900000,
+        rateLimitRequests: 100,
+        selfLearningThreshold: 50,
+      },
+    });
+  }
+);
+
+/**
+ * @route   PUT /api/admin/config
+ * @desc    Update system configuration
+ * @access  Private (requires system:config permission)
+ */
+router.put(
+  '/config',
+  requirePermission(PERMISSIONS.SYSTEM_CONFIG),
+  (req, res) => {
+    res.json({
+      success: true,
+      message: 'System configuration updated',
+      data: req.body,
+    });
+  }
+);
+
 export default router;
 

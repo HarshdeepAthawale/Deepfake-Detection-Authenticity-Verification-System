@@ -20,22 +20,22 @@ router.use(authenticate);
 /**
  * @route   GET /api/admin/audit
  * @desc    Get audit logs with filtering
- * @access  Private (requires system:admin permission)
+ * @access  Private (requires audit:view permission)
  */
 router.get(
   '/',
-  requirePermission(PERMISSIONS.SYSTEM_ADMIN),
+  requirePermission(PERMISSIONS.AUDIT_VIEW),
   getAuditLogsHandler
 );
 
 /**
  * @route   GET /api/admin/audit/:id
  * @desc    Get audit log by ID
- * @access  Private (requires system:admin permission)
+ * @access  Private (requires audit:view permission)
  */
 router.get(
   '/:id',
-  requirePermission(PERMISSIONS.SYSTEM_ADMIN),
+  requirePermission(PERMISSIONS.AUDIT_VIEW),
   getAuditLogByIdHandler
 );
 

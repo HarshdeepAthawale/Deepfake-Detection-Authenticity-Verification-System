@@ -66,7 +66,7 @@ router.get(
  */
 router.patch(
   '/:id/tags',
-  requirePermission(PERMISSIONS.SCAN_VIEW),
+  requirePermission(PERMISSIONS.SCAN_EDIT),
   updateTags
 );
 

@@ -15,8 +15,23 @@ import {
 
 const router = express.Router();
 
-// Internal callback from ML service - NO AUTH (called by ml-service container)
-router.post('/training-complete', trainingCompleteCallback);
+// Middleware to verify internal ML service requests
+const verifyMLServiceSecret = (req, res, next) => {
+  const mlSecret = process.env.ML_SERVICE_SECRET || 'ml-service-internal-secret';
+  const providedSecret = req.headers['x-ml-service-secret'];
+
+  if (providedSecret !== mlSecret) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Invalid or missing ML service secret',
+    });
+  }
+
+  next();
+};
+
+// Internal callback from ML service - requires ML service secret header
+router.post('/training-complete', verifyMLServiceSecret, trainingCompleteCallback);
 
 // All other routes require admin authentication
 router.use(authenticate);
