@@ -147,14 +147,6 @@ deepfake-detection-system/
 └── docker-compose.yml     # Docker config
 ```
 
-## Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/name`
-3. Commit: `git commit -m 'Add feature'`
-4. Push: `git push origin feature/name`
-5. Open Pull Request
-
 ## License
 
 Proprietary. All rights reserved. See LICENSE for details.
