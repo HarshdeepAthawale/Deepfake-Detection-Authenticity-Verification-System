@@ -107,64 +107,6 @@ pip install -r requirements.txt && python app.py
 | **SUSPICIOUS** | 40-74% | Moderate indicators |
 | **AUTHENTIC** | <40% | Likely genuine |
 
-## API Endpoints
-
-### Authentication
-```
-POST   /api/auth/login        - Login
-POST   /api/auth/register     - Register
-GET    /api/auth/me           - Get current user
-```
-
-### Scans
-```
-POST   /api/scans/upload      - Upload single file
-POST   /api/scans/batch       - Upload multiple (max 50)
-GET    /api/scans/history     - Scan history
-GET    /api/scans/:id         - Get scan details
-DELETE /api/scans/:id         - Delete scan
-```
-
-### Admin
-```
-GET    /api/admin/stats       - System stats
-GET    /api/admin/audit       - Audit logs
-GET    /api/admin/ml/health   - ML service health
-GET    /api/users             - List users
-POST   /api/users             - Create user
-```
-
-### Reports
-```
-GET    /api/reports/scans/:id/pdf   - Export PDF
-GET    /api/reports/scans/:id/json  - Export JSON
-GET    /api/reports/scans/csv       - Bulk CSV
-```
-
-## Security
-
-- **JWT Authentication**: 24h expiry, 7d refresh tokens
-- **Password**: bcrypt with 12 rounds
-- **OAuth 2.0**: Google login support
-- **RBAC**: Admin, Operative, Analyst roles
-- **Data Protection**: SHA-256 hashing, AES-256 encryption
-- **Rate Limiting**: 100 req/15 min
-- **Security Headers**: Helmet.js (CSP, HSTS, XSS)
-- **Input Validation**: Zod schemas
-- **Audit Trail**: Complete action logging
-
-## Deployment
-
-### Production Checklist
-- [ ] Update `.env` secrets
-- [ ] Enable HTTPS with SSL
-- [ ] Configure firewall (80, 443, 22)
-- [ ] Enable MongoDB auth
-- [ ] Set up regular backups
-- [ ] Configure rate limiting
-- [ ] Review CORS settings
-- [ ] Set up monitoring
-
 ## Project Structure
 
 ```
@@ -181,14 +123,6 @@ deepfake-detection-system/
 └── docker-compose.yml     # Docker config
 ```
 
-## Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/name`
-3. Commit: `git commit -m 'Add feature'`
-4. Push: `git push origin feature/name`
-5. Open Pull Request
-
 ## License
 
 Proprietary. All rights reserved. See LICENSE for details.
@@ -197,7 +131,3 @@ Proprietary. All rights reserved. See LICENSE for details.
 
 - **Issues**: [GitHub Issues](https://github.com/HarshdeepAthawale/Deepfake-Detection-Authenticity-Verification-System/issues)
 - **Documentation**: [docs/](docs/)
-
----
-
-**Built for tactical field deployment. No shortcuts taken.**
