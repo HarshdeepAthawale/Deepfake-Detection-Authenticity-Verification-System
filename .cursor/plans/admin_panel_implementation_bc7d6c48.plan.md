@@ -48,6 +48,7 @@ todos:
     status: completed
     dependencies:
       - admin-dashboard
+isProject: false
 ---
 
 # Admin Panel Imple
@@ -82,43 +83,30 @@ flowchart TD
 ### 1. User Service (`backend/src/users/user.service.js`)
 
 - `getAllUsers(page, limit, filters)` - Get paginated list of all users
-
 - `getUserById(userId)` - Get user by ID
-
 - `createUser(userData)` - Create new user (with validation)
-
 - `updateUser(userId, userData)` - Update user (prevent changing to admin if admin exists)
-
 - `deleteUser(userId)` - Delete user (prevent deleting admin)
-
 - `getUserStats()` - Get user statistics (total, by role, active/inactive)
 
 ### 2. User Controller (`backend/src/users/user.controller.js`)
 
 - `getUsers` - GET /api/users (with pagination and filters)
-
 - `getUser` - GET /api/users/:id
-
 - `createUser` - POST /api/users
-
 - `updateUser` - PUT /api/users/:id
-
 - `deleteUser` - DELETE /api/users/:id
-
 - `getStats` - GET /api/users/stats
 
 ### 3. User Routes (`backend/src/users/user.routes.js`)
 
 - All routes require authentication
-
 - All routes require admin permissions (USER_VIEW, USER_CREATE, USER_EDIT, USER_DELETE)
-
 - Register routes in [backend/src/app.js](backend/src/app.js)
 
 ### 4. Admin Stats Endpoint
 
 - Add `getAdminStats` in scan controller or create admin controller
-
 - GET /api/admin/stats - Returns system-wide statistics (total scans, users, deepfakes detected, etc.)
 
 ## Frontend Implementation
@@ -128,52 +116,39 @@ flowchart TD
 Add admin methods:
 
 - `getAllUsers(page, limit, filters)` - Fetch users with pagination
-
 - `createUser(userData)` - Create new user
-
 - `updateUser(userId, userData)` - Update user
-
 - `deleteUser(userId)` - Delete user
-
 - `getUserStats()` - Get user statistics
-
 - `getAdminStats()` - Get system statistics
 
 ### 2. Admin Protected Route (`components/admin-protected-route.tsx`)
 
 - Similar to `ProtectedRoute` but checks for admin role
-
 - Redirects non-admin users to dashboard
 
 ### 3. Admin Dashboard Page (`app/admin/page.tsx`)
 
 - Main admin dashboard with:
-
 - System statistics cards (total users, scans, deepfakes detected)
 - Quick actions
-
 - Recent activity feed
-
 - Uses `TacticalShell` with `activeTab="admin"`
 
 ### 4. User Management Components
 
 - `components/admin/user-list.tsx` - Table/list of all users with actions
-
 - `components/admin/user-form.tsx` - Create/edit user form
-
 - `components/admin/user-stats.tsx` - User statistics display
 
 ### 5. Update Navigation (`components/tactical-shell.tsx`)
 
 - Add "Admin Panel" nav item (only visible when `user.role === 'admin'`)
-
 - Link to `/admin` route
 
 ### 6. Admin Stats Component (`components/admin/admin-stats.tsx`)
 
 - Display system-wide statistics
-
 - Charts/graphs for visual representation
 
 ## Key Features
@@ -181,38 +156,26 @@ Add admin methods:
 ### User Management
 
 - View all users with pagination
-
 - Filter by role, status (active/inactive)
-
 - Create new users (default role: operative, cannot create admin)
-
 - Edit user details (email, role, metadata, isActive)
-
 - Delete users (with confirmation, cannot delete admin)
-
 - View user statistics
 
 ### System Statistics
 
 - Total users count
-
 - Users by role breakdown
-
 - Total scans
 - Deepfakes detected count
-
 - System health metrics
 
 ### Security
 
 - All admin routes protected with `requirePermission(PERMISSIONS.USER_*)`
-
 - Frontend role check before showing admin panel
-
 - Prevent creating multiple admins (backend validation)
-
 - Prevent deleting admin user
-
 - Prevent changing user to admin if admin exists
 
 ## File Structure
@@ -241,21 +204,14 @@ components/
     admin-stats.tsx (new)
 ```
 
-
-
 ## Implementation Order
 
 1. Backend user service and controller
-
 2. Backend user routes and registration
-
 3. Admin stats endpoint
-
 4. Frontend API service methods
-
 5. Admin protected route component
-
 6. Admin dashboard page
-
 7. User management components
 8. Update navigation
+

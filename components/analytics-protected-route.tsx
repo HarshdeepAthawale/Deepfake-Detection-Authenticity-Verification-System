@@ -11,7 +11,7 @@ export function AnalyticsProtectedRoute({ children }: { children: React.ReactNod
   useEffect(() => {
     if (!loading) {
       if (!isAuthenticated) {
-        router.push("/")
+        router.push("/login")
         return
       }
       

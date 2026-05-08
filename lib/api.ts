@@ -673,6 +673,60 @@ export const apiService = {
   },
 
   /**
+   * User: Update own profile (firstName, lastName, department)
+   */
+  async updateProfile(data: {
+    firstName?: string
+    lastName?: string
+    department?: string
+  }): Promise<{
+    success: boolean
+    message: string
+    data: { user: any }
+  }> {
+    return authenticatedRequest(`/auth/me`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    })
+  },
+
+  /**
+   * User: Change own password
+   */
+  async changePassword(data: {
+    currentPassword: string
+    newPassword: string
+    confirmPassword: string
+  }): Promise<{
+    success: boolean
+    message: string
+  }> {
+    return authenticatedRequest(`/auth/me/password`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    })
+  },
+
+  /**
+   * User: Update notification preferences
+   */
+  async updateNotificationPreferences(data: {
+    emailEnabled?: boolean
+    emailOnDeepfake?: boolean
+    emailOnAll?: boolean
+    inAppEnabled?: boolean
+  }): Promise<{
+    success: boolean
+    message: string
+    data: any
+  }> {
+    return authenticatedRequest(`/auth/me/notifications`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    })
+  },
+
+  /**
    * Admin: Get system-wide statistics
    */
   async getAdminStats(): Promise<{
