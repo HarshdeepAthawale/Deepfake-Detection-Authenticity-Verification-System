@@ -101,16 +101,19 @@ def preprocess_image(image_input, detect_faces=True, return_face_info=False):
         raise
 
 
-def preprocess_batch(image_paths, detect_faces=True):
+def preprocess_batch(image_paths, detect_faces=True, return_face_counts=False):
     """
     Preprocess a batch of images for model inference
 
     Args:
         image_paths: List of image file paths
         detect_faces: If True, detect and crop faces before preprocessing (default: True)
+        return_face_counts: If True, return a third value — the count of frames where
+                            a face was actually detected (default: False)
 
     Returns:
-        List of PIL Images and list of valid paths
+        (images, valid_paths) when return_face_counts=False
+        (images, valid_paths, faces_detected_count) when return_face_counts=True
     """
     try:
         if not image_paths:
@@ -118,10 +121,20 @@ def preprocess_batch(image_paths, detect_faces=True):
 
         images = []
         valid_paths = []
+        faces_detected_count = 0
 
         for path in image_paths:
             try:
-                image = preprocess_image(path, detect_faces=detect_faces)
+                if return_face_counts:
+                    # Use return_face_info=True to get the actual face detection result
+                    image, face_found = preprocess_image(
+                        path, detect_faces=detect_faces, return_face_info=True
+                    )
+                    if face_found:
+                        faces_detected_count += 1
+                else:
+                    image = preprocess_image(path, detect_faces=detect_faces)
+
                 images.append(image)
                 valid_paths.append(path)
             except Exception as e:
@@ -131,6 +144,10 @@ def preprocess_batch(image_paths, detect_faces=True):
         if not images:
             raise ValueError('No valid images found in batch')
 
+        if return_face_counts:
+            logger.debug(f'[PREPROCESSING] Batch complete: {len(images)} images, {faces_detected_count} faces detected')
+            return images, valid_paths, faces_detected_count
+
         return images, valid_paths
 
     except Exception as e:
@@ -138,7 +155,7 @@ def preprocess_batch(image_paths, detect_faces=True):
         raise
 
 
-def preprocess_frames(frame_paths, max_frames=None, detect_faces=True):
+def preprocess_frames(frame_paths, max_frames=None, detect_faces=True, return_face_counts=False):
     """
     Preprocess video frames for inference
 
@@ -146,26 +163,30 @@ def preprocess_frames(frame_paths, max_frames=None, detect_faces=True):
         frame_paths: List of frame file paths
         max_frames: Maximum number of frames to process (None = all)
         detect_faces: If True, detect and crop faces before preprocessing (default: True)
+        return_face_counts: If True, return a third value — the count of frames where
+                            a face was actually detected (default: False)
 
     Returns:
-        List of PIL Images and list of processed frame paths
+        (images, valid_paths) when return_face_counts=False
+        (images, valid_paths, faces_detected_count) when return_face_counts=True
     """
     try:
         if not frame_paths:
             logger.warning('[PREPROCESSING] No frame paths provided')
+            if return_face_counts:
+                return [], [], 0
             return [], []
 
-        # Limit number of frames if specified
+        # Limit number of frames if specified — sample evenly across the full timeline
         if max_frames and len(frame_paths) > max_frames:
-            # Sample frames evenly
             step = len(frame_paths) // max_frames
             frame_paths = frame_paths[::step][:max_frames]
-            logger.info(f'[PREPROCESSING] Sampling {len(frame_paths)} frames')
+            logger.info(f'[PREPROCESSING] Sampling {len(frame_paths)} frames (max_frames={max_frames})')
 
-        # Preprocess batch
-        images, valid_paths = preprocess_batch(frame_paths, detect_faces=detect_faces)
+        # Preprocess batch, optionally tracking face detection
+        result = preprocess_batch(frame_paths, detect_faces=detect_faces, return_face_counts=return_face_counts)
 
-        return images, valid_paths
+        return result
 
     except Exception as e:
         logger.error(f'[PREPROCESSING] Error preprocessing frames: {str(e)}')

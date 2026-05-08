@@ -1,0 +1,189 @@
+
+
+---
+
+## 🛡️ SENTINEL – Deepfake Detection & Authenticity Verification System
+### DBMS Project Explanation (UCS310)
+
+---
+
+### 1. Problem & Idea
+
+Aaj ke time pe AI se fake videos, images aur audio banana bahut aasan ho gaya hai (deepfakes). Inhe track karna aur verify karna ek bada problem hai. SENTINEL ek **centralized database system** hai jo deepfake detection ke results ko store aur manage karta hai — users, scans, verdicts, audit logs sab kuch ek jagah.
+
+ML/frontend humara scope nahi hai — sirf **backend database** implement karna hai (pure DBMS project).
+
+---
+
+### 2. Tables (6 tables banaye hain)
+
+| Table | Kya store karta hai |
+|---|---|
+| **Users** | System ke users — Admin, Operative, Analyst |
+| **Scans** | Jo media (video/image/audio) scan ke liye submit ki gayi |
+| **VerdictTypes** | Teen verdicts — DEEPFAKE, SUSPICIOUS, AUTHENTIC |
+| **AuditLogs** | Har action ka record (kaun ne kya kiya) |
+| **Notifications** | Users ko bheje gaye alerts |
+| **EvidenceVault** | Scan ke proof files store hoti hain |
+
+---
+
+### 3. Roles (Teen types ke users)
+
+- **Admin** → System manage karta hai, users banata hai, reports dekhta hai
+- **Operative** → Media upload karta hai scan ke liye, apna scan history dekhta hai
+- **Analyst** → Sabke scans review karta hai, reports generate karta hai, evidence vault access karta hai
+
+---
+
+### 4. Verdict System
+
+Risk Score ke basis pe automatically verdict decide hota hai:
+
+| Verdict | Risk Score |
+|---|---|
+| AUTHENTIC | 0% – 39% |
+| SUSPICIOUS | 40% – 74% |
+| DEEPFAKE | 75% – 100% |
+
+---
+
+### 5. Relationships (ER Diagram)
+
+- Ek User → Many Scans submit kar sakta hai
+- Ek User → Many AuditLogs generate karta hai
+- Ek User → Many Notifications receive karta hai
+- Ek Scan → Many Evidence files ho sakti hain
+- Ek VerdictType → Many Scans classify karta hai
+
+---
+
+### 6. Normalization (3NF/BCNF)
+
+**Problem pehle:** Scans table mein VerdictName, RiskMin, RiskMax sab tha → transitive dependency thi (RiskScore → VerdictName → RiskMin/RiskMax)
+
+**Solution:** VerdictTypes ko alag table mein nikal diya. Ab Scans mein sirf `VerdictID` (FK) hai.
+
+- **1NF** ✅ → Sab atomic values, koi repeating group nahi
+- **2NF** ✅ → Single-column PKs hain, partial dependency ka question hi nahi
+- **3NF** ✅ → VerdictTypes alag nikaal ke transitive dependency khatam
+- **BCNF** ✅ → Sab determinants candidate keys hain
+
+---
+
+### 7. Constraints (Important ones)
+
+| Table | Constraint | Kyu |
+|---|---|---|
+| Users | UNIQUE(Email) | Duplicate accounts nahi |
+| Users | CHECK(Role) | Sirf admin/operative/analyst allowed |
+| Scans | UNIQUE(FileHash) | Same file dobara scan nahi ho sakti |
+| Scans | CHECK(RiskScore) | 0 se 100 ke beech hi hona chahiye |
+| EvidenceVault | UNIQUE(SHA256Hash) | Duplicate evidence nahi |
+
+---
+
+### 8. Stored Procedures (9 banaye)
+
+Stored procedures = pre-written SQL code jo ek naam se call kar sakte ho
+
+| Procedure | Kya karta hai |
+|---|---|
+| `sp_submit_scan` | User validate karta hai, duplicate hash check karta hai, scan + audit log ek saath insert karta hai |
+| `sp_store_evidence` | Check karta hai scan COMPLETED hai ya nahi, phir evidence store karta hai |
+| `sp_update_scan_verdict` | VerdictTypes se VerdictID resolve karta hai, scan update karta hai, notification bhejta hai |
+| `sp_generate_user_report` | User ka scan statistics aggregate karta hai |
+| `proc_scan_summary_report` | Cursor se ek date range ke completed scans iterate karta hai |
+| `proc_deepfake_threat_report` | Cursor se sabhi DEEPFAKE verdicts iterate karta hai |
+| `proc_risk_analytics_report` | Cursor se per-user risk stats nikalta hai |
+| `proc_user_activity_log` | Specific user ka poora audit trail nikalta hai |
+
+---
+
+### 9. User-Defined Functions (4 banaye)
+
+Functions = kuch calculate/check karte hain aur ek value return karte hain
+
+| Function | Kya return karta hai |
+|---|---|
+| `fn_validate_upload` | TRUE/FALSE — file hash unique hai aur user valid hai? |
+| `fn_get_verdict_label` | Risk score deke verdict label return karta hai |
+| `fn_count_user_scans` | Ek user ke completed scans ka count (verdict filter ke saath) |
+| `fn_user_threat_level` | User ka threat level — HIGH / MEDIUM / LOW |
+
+---
+
+### 10. Triggers (6 banaye)
+
+Triggers = automatically fire hote hain jab koi specific event hota hai (insert/update)
+
+| Trigger | Kab fire hota hai | Kya karta hai |
+|---|---|---|
+| `trg_prevent_duplicate_hash` | BEFORE INSERT on Scans | Duplicate FileHash block karta hai |
+| `trg_auto_audit_on_scan_insert` | AFTER INSERT on Scans | Automatically AuditLog entry banata hai |
+| `trg_set_verdict_on_risk_update` | BEFORE UPDATE on Scans | RiskScore set hone pe VerdictID auto-resolve karta hai |
+| `trg_auto_notify_on_verdict` | AFTER UPDATE on Scans | Status COMPLETED hone pe notification bhejta hai |
+| `trg_prevent_duplicate_evidence` | BEFORE INSERT on EvidenceVault | Duplicate SHA256Hash block karta hai |
+| `trg_audit_on_evidence_insert` | AFTER INSERT on EvidenceVault | Evidence store hone pe auto-log karta hai |
+
+---
+
+### 11. Views (5 banaye)
+
+Views = virtual tables jo complex JOINs ko ek simple naam se access deti hain
+
+| View | Kya dikhata hai |
+|---|---|
+| `v_scan_summary` | Sabhi scans + user name + verdict ek saath |
+| `v_user_risk_stats` | Per-user deepfake/suspicious/authentic count aur avg risk score |
+| `v_audit_trail` | Poora audit log with user details |
+| `v_evidence_vault` | Evidence vault with scan aur user details |
+| `v_unread_notifications` | Sabhi unread notifications |
+
+---
+
+### 12. Transactions (ACID properties)
+
+**5 transaction scenarios implement kiye:**
+
+1. **Full scan submit** → INSERT scan + INSERT audit log + INSERT notification → ek saath COMMIT ya ek saath ROLLBACK
+2. **Verdict update with SAVEPOINT** → scan update karo → SAVEPOINT lagao → notification insert karo (fail hone pe sirf ROLLBACK TO SAVEPOINT, pura rollback nahi)
+3. **Evidence duplicate detection** → INSERT evidence → trigger fire hota hai → duplicate hash pe ROLLBACK
+4. **Concurrent scan** → Do users same file hash bhejte hain → ek blocked by UNIQUE constraint
+5. **Atomic user creation** → INSERT user + INSERT audit log + INSERT welcome notification → ek saath COMMIT
+
+**ACID matlab:**
+- **A**tomicity → Ya sab hoga ya kuch nahi
+- **C**onsistency → Data hamesha valid state mein rahega
+- **I**solation → Concurrent users ek doosre ko affect nahi karenge
+- **D**urability → Commit ke baad data safe rahega
+
+---
+
+### 13. Technology Stack
+
+- **Database:** MariaDB 12.2.2 (MySQL-compatible)
+- **Language:** SQL + PL/SQL
+- **Tool:** MySQL Workbench / MariaDB CLI
+- **OS:** Linux (Arch)
+
+---
+
+### 14. Final Stats
+
+| Item | Count |
+|---|---|
+| Tables | 6 |
+| Total Rows | 83+ |
+| Stored Procedures | 9 |
+| User-Defined Functions | 4 |
+| Triggers | 6 |
+| Analytics Views | 5 |
+| Cursor-based Reports | 4 |
+| Indexes | 14 |
+| Foreign Key Constraints | 5 |
+| Transaction Scenarios | 5 |
+
+---
+
+Yeh sab copy-paste kar de unhe — ekdum point to point hai, padh ke sab samajh aa jayega! 🎯

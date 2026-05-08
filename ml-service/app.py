@@ -39,12 +39,41 @@ logger = logging.getLogger(__name__)
 # Global model status
 _model_loaded = False
 
+# ---------------------------------------------------------------------------
+# Inference configuration — all thresholds driven by environment variables.
+# No magic numbers in inference logic below.
+# ---------------------------------------------------------------------------
+INFERENCE_CONFIG = {
+    # Maximum frames to process per request (caller can send fewer via maxFrames)
+    'max_frames': int(os.environ.get('ML_MAX_FRAMES', '120')),
+    # Audio/video fusion weights (must sum to 1.0)
+    'video_weight': float(os.environ.get('ML_VIDEO_WEIGHT', '0.60')),
+    'audio_weight': float(os.environ.get('ML_AUDIO_WEIGHT', '0.40')),
+    # Confidence penalties for low face-detection rates
+    'face_penalty_very_low': float(os.environ.get('ML_FACE_PENALTY_VERY_LOW', '0.20')),   # <30% face rate
+    'face_penalty_low':      float(os.environ.get('ML_FACE_PENALTY_LOW',      '0.10')),   # <50% face rate
+    'face_penalty_moderate': float(os.environ.get('ML_FACE_PENALTY_MODERATE', '0.05')),   # <70% face rate
+    # Face-detection rate thresholds that trigger the penalties above
+    'face_rate_very_low': float(os.environ.get('ML_FACE_RATE_VERY_LOW', '0.30')),
+    'face_rate_low':      float(os.environ.get('ML_FACE_RATE_LOW',      '0.50')),
+    'face_rate_moderate': float(os.environ.get('ML_FACE_RATE_MODERATE', '0.70')),
+    # Blend fraction of peak_risk added to risk_score when peak is much higher
+    'peak_blend_fraction': float(os.environ.get('ML_PEAK_BLEND_FRACTION', '0.30')),
+    'peak_blend_gap':      float(os.environ.get('ML_PEAK_BLEND_GAP',      '10.0')),
+}
+
 
 def load_model_on_startup():
-    """Load models when service starts (image and audio)"""
+    """Load models when service starts.
+
+    Image model is loaded synchronously so health-check returns immediately.
+    Audio model is loaded in a background daemon thread to avoid blocking startup
+    while still being warm before the first real video-with-audio request arrives.
+    """
+    import threading
     global _model_loaded
 
-    # Load image model (required)
+    # Load image model synchronously (required for health-check to pass)
     try:
         logger.info('[ML_SERVICE] Loading image model on startup...')
         load_model()
@@ -54,9 +83,18 @@ def load_model_on_startup():
         logger.error(f'[ML_SERVICE] Failed to load image model: {str(e)}', exc_info=True)
         _model_loaded = False
 
-    # Audio model loads lazily on first use (to not block server startup)
-    # This allows the service to be healthy immediately
-    logger.info('[ML_SERVICE] Audio model will load lazily on first audio request')
+    # Pre-warm audio model in the background so it is ready before the first video request
+    def _preload_audio():
+        try:
+            logger.info('[ML_SERVICE] Pre-loading audio model in background thread...')
+            load_audio_model()
+            logger.info('[ML_SERVICE] Audio model pre-loaded successfully')
+        except Exception as e:
+            logger.warning(f'[ML_SERVICE] Background audio model load failed: {str(e)} — will retry lazily on first use')
+
+    audio_thread = threading.Thread(target=_preload_audio, daemon=True, name='audio-model-loader')
+    audio_thread.start()
+    logger.info('[ML_SERVICE] Audio model loading in background thread (non-blocking)')
 
 
 def extract_fake_probability(result):
@@ -229,6 +267,49 @@ def run_inference(pipeline, images):
         raise
 
 
+def compute_gan_fingerprint(fake_probs, video_score):
+    """
+    Compute a GAN-fingerprint score that is distinct from the raw video_score.
+
+    Rather than copying video_score verbatim, this measures the *localised spike*
+    pattern that is characteristic of GAN-generated regions:
+      - A genuine deepfake tends to produce inconsistent per-frame scores with
+        high-confidence outlier frames (the manipulated segments).
+      - An authentic video tends to produce uniformly low or uniformly moderate
+        scores with little variance.
+
+    Formula:
+        fingerprint = (peak_prob - mean_prob) * 200   (clamped to 0–100)
+    For single-frame inputs (image/no multi-frame), falls back to video_score.
+
+    Args:
+        fake_probs: list/array of per-frame fake probabilities [0, 1]
+        video_score: already-computed P90 video score (0–100), used as fallback
+
+    Returns:
+        float 0–100 representing estimated GAN-artifact level
+    """
+    if fake_probs is None or len(fake_probs) < 2:
+        # Single frame — no temporal spike possible; use model score directly
+        return float(video_score)
+
+    arr = np.array(fake_probs)
+    mean_prob = float(np.mean(arr))
+    peak_prob = float(np.max(arr))
+
+    # Spike magnitude: how much the worst frame exceeds the average
+    spike = peak_prob - mean_prob  # range [0, ~1]
+
+    # Scale: spike of 0.5 → fingerprint of 100 (extreme localised anomaly)
+    fingerprint = min(100.0, spike * 200.0)
+
+    # Blend with video_score so the fingerprint also reflects the overall model signal
+    # (prevents very high spike on low-probability noise from inflating the score)
+    blended = fingerprint * 0.6 + video_score * 0.4
+
+    return round(max(0.0, min(100.0, blended)), 2)
+
+
 def calculate_scores(fake_probs, media_type, frame_count=1, faces_detected=0, audio_fake_prob=None):
     """
     Calculate detection scores from model predictions
@@ -259,14 +340,17 @@ def calculate_scores(fake_probs, media_type, frame_count=1, faces_detected=0, au
             peak_risk = 0.0
             mean_risk = 0.0
 
-        # GAN fingerprint score (same as video score for this model)
-        gan_fingerprint = video_score
+        # GAN fingerprint: measures localised spike pattern (distinct from video_score)
+        gan_fingerprint = compute_gan_fingerprint(fake_probs.tolist(), video_score)
 
         # Temporal consistency for videos
+        # variance is in [0, 0.25] for probabilities in [0, 1].
+        # We normalise by the theoretical maximum (0.25) so the formula is:
+        #   consistency = 100 * (1 - variance / 0.25) = 100 * (1 - variance * 4)
+        # This gives: variance=0 → 100%, variance=0.1 → 60%, variance=0.25 → 0%
         if media_type == 'VIDEO' and len(fake_probs) > 1:
             variance = float(np.var(fake_probs))
-            # Higher variance = lower consistency
-            temporal_consistency = max(0, min(100, 100 - (variance * 1000)))
+            temporal_consistency = max(0.0, min(100.0, 100.0 * (1.0 - variance * 4.0)))
         else:
             temporal_consistency = 100.0
 
@@ -287,37 +371,44 @@ def calculate_scores(fake_probs, media_type, frame_count=1, faces_detected=0, au
         else:
             confidence = 0.0
 
-        # Apply confidence penalty based on face detection rate
-        # Lower face detection = lower confidence in results
+        # Apply confidence penalty based on face detection rate.
+        # All thresholds and penalties come from INFERENCE_CONFIG (env-var driven).
         if frame_count > 0:
             face_detection_rate = faces_detected / frame_count
             confidence_penalty = 0.0
 
-            if face_detection_rate < 0.3:
-                # Very low face detection (<30%): 20% penalty
-                confidence_penalty = 0.20
-                logger.warning(f'[ML_SERVICE] Very low face detection rate: {face_detection_rate:.1%} - applying 20% confidence penalty')
-            elif face_detection_rate < 0.5:
-                # Low face detection (<50%): 10% penalty
-                confidence_penalty = 0.10
-                logger.warning(f'[ML_SERVICE] Low face detection rate: {face_detection_rate:.1%} - applying 10% confidence penalty')
-            elif face_detection_rate < 0.7:
-                # Moderate face detection (<70%): 5% penalty
-                confidence_penalty = 0.05
-                logger.info(f'[ML_SERVICE] Moderate face detection rate: {face_detection_rate:.1%} - applying 5% confidence penalty')
+            if face_detection_rate < INFERENCE_CONFIG['face_rate_very_low']:
+                confidence_penalty = INFERENCE_CONFIG['face_penalty_very_low']
+                logger.warning(
+                    f'[ML_SERVICE] Very low face detection rate: {face_detection_rate:.1%} '
+                    f'— applying {confidence_penalty:.0%} confidence penalty'
+                )
+            elif face_detection_rate < INFERENCE_CONFIG['face_rate_low']:
+                confidence_penalty = INFERENCE_CONFIG['face_penalty_low']
+                logger.warning(
+                    f'[ML_SERVICE] Low face detection rate: {face_detection_rate:.1%} '
+                    f'— applying {confidence_penalty:.0%} confidence penalty'
+                )
+            elif face_detection_rate < INFERENCE_CONFIG['face_rate_moderate']:
+                confidence_penalty = INFERENCE_CONFIG['face_penalty_moderate']
+                logger.info(
+                    f'[ML_SERVICE] Moderate face detection rate: {face_detection_rate:.1%} '
+                    f'— applying {confidence_penalty:.0%} confidence penalty'
+                )
 
-            # Apply penalty
             if confidence_penalty > 0:
                 original_confidence = confidence
-                confidence = confidence * (1 - confidence_penalty)
+                confidence = confidence * (1.0 - confidence_penalty)
                 logger.info(f'[ML_SERVICE] Confidence adjusted: {original_confidence:.2f}% → {confidence:.2f}%')
 
-        # Calculate combined risk score
+        # Calculate combined risk score — weights from INFERENCE_CONFIG
+        v_w = INFERENCE_CONFIG['video_weight']
+        a_w = INFERENCE_CONFIG['audio_weight']
+
         if media_type == 'VIDEO' and audio_score > 0:
-            # VIDEO with audio: weighted combination
-            # 60% video, 40% audio - but use max if one is much higher (partial deepfake)
-            weighted_score = (video_score * 0.6) + (audio_score * 0.4)
-            risk_score = max(weighted_score, video_score, audio_score * 0.9)
+            # VIDEO with audio: weighted combination, but take max to catch partial deepfakes
+            weighted_score = (video_score * v_w) + (audio_score * a_w)
+            risk_score = max(weighted_score, video_score, audio_score * (a_w + 0.5))
             logger.info(f'[ML_SERVICE] Combined video+audio risk: weighted={weighted_score:.2f}, final={risk_score:.2f}')
         elif media_type == 'AUDIO':
             # AUDIO only: use audio score directly
@@ -326,9 +417,12 @@ def calculate_scores(fake_probs, media_type, frame_count=1, faces_detected=0, au
             # VIDEO/IMAGE without audio: use video score
             risk_score = video_score
 
-        # If peak is significantly higher than current risk, blend them
-        if peak_risk > risk_score + 10:
-            risk_score = (risk_score * 0.7) + (peak_risk * 0.3)
+        # If the peak is significantly above the current risk score, blend it in
+        # (catches localized deepfake segments that the P90 metric may underweight)
+        peak_gap = INFERENCE_CONFIG['peak_blend_gap']
+        peak_fraction = INFERENCE_CONFIG['peak_blend_fraction']
+        if peak_risk > risk_score + peak_gap:
+            risk_score = risk_score * (1.0 - peak_fraction) + peak_risk * peak_fraction
 
         risk_score = min(100, max(0, risk_score))
 
@@ -403,6 +497,15 @@ def inference():
         extracted_frames = data.get('extractedFrames', [])
         extracted_audio = data.get('extractedAudio', None)
 
+        # max_frames: caller (perception agent) sends how many frames it extracted.
+        # We respect that value but clamp to our service ceiling (INFERENCE_CONFIG['max_frames']).
+        # If the caller doesn't send it (None / absent), process all provided frames.
+        caller_max_frames = data.get('maxFrames', None)
+        if caller_max_frames and isinstance(caller_max_frames, int) and caller_max_frames > 0:
+            max_frames = min(caller_max_frames, INFERENCE_CONFIG['max_frames'])
+        else:
+            max_frames = INFERENCE_CONFIG['max_frames']
+
         logger.info(f'[ML_SERVICE] Inference request: hash={hash_value[:16] if hash_value else "none"}..., type={media_type}, model={model_version}')
 
         # Get pipeline
@@ -450,28 +553,22 @@ def inference():
             if not valid_paths:
                 raise ValueError('No valid frame files found')
 
-            # Process frames (limit to max 30 frames for performance)
-            max_frames = 30
-            images, valid_frames = preprocess_frames(valid_paths, max_frames=max_frames)
+            # Process frames — use return_face_counts=True to get real face detection results
+            # instead of guessing via aspect-ratio (which was always wrong).
+            images, valid_frames, faces_detected = preprocess_frames(
+                valid_paths, max_frames=max_frames, return_face_counts=True
+            )
 
             if not images or len(valid_frames) == 0:
                 raise ValueError('No valid frames processed')
 
             total_frames = len(valid_frames)
+            processed_images = images
 
-            # Check face detection for each frame
-            faces_detected = 0
-            processed_images = []
-            for img in images:
-                # Note: images are already preprocessed with face detection
-                # We assume preprocessing applied face detection
-                # Check if it's a face crop by comparing aspect ratio and size
-                w, h = img.size
-                aspect_ratio = w / h if h > 0 else 1
-                # Face crops are typically square-ish (aspect ratio near 1)
-                if 0.7 <= aspect_ratio <= 1.3:
-                    faces_detected += 1
-                processed_images.append(img)
+            logger.info(
+                f'[ML_SERVICE] Preprocessed {total_frames} frames, '
+                f'{faces_detected} faces detected ({faces_detected/total_frames:.1%} rate)'
+            )
 
             # Run video/image inference on all frames
             fake_probs, results = run_inference(pipeline, processed_images)

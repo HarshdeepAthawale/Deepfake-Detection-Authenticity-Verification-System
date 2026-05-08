@@ -5,7 +5,7 @@ services:
     container_name: deepfake-mongodb
     restart: unless-stopped
     ports:
-      - "27018:27017"
+      - "27019:27017"
     environment:
       MONGO_INITDB_DATABASE: deepfake-detection
     volumes:
@@ -48,18 +48,18 @@ services:
       - "3001:3001"
     environment:
       PORT: 3001
-      NODE_ENV: production
+      NODE_ENV: development
       MONGODB_URI: mongodb://mongodb:27017/deepfake-detection
       DB_NAME: deepfake-detection
-      JWT_SECRET: ${JWT_SECRET:-change-this-secret-key-in-production-minimum-32-characters-long-please}
+      JWT_SECRET: ${JWT_SECRET:-sentinel-deepfake-jwt-secret-key-dev-32chars}
       JWT_EXPIRES_IN: 24h
       JWT_REFRESH_EXPIRES_IN: 7d
       MAX_FILE_SIZE: 500000000
       UPLOAD_PATH: ./uploads
       ALLOWED_MIME_TYPES: video/mp4,video/avi,video/mov,video/webm,audio/mpeg,audio/wav,audio/mp3,image/jpeg,image/png
       BCRYPT_ROUNDS: 12
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-32-character-encryption-key-please}
-      ENCRYPTION_IV: ${ENCRYPTION_IV:-change-this-16}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-sentinel-encrypt-key-32charssssssssss}
+      ENCRYPTION_IV: ${ENCRYPTION_IV:-sentineliv123456}
       LOG_LEVEL: info
       LOG_FILE_PATH: ./logs/app.log
       RATE_LIMIT_WINDOW_MS: 900000
@@ -139,16 +139,17 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-900108796300-1ag26bmttfmh9h6qcdulo8fuonm0dmrc.apps.googleusercontent.com}
     container_name: deepfake-frontend
     restart: unless-stopped
     ports:
       - "3002:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-900108796300-1ag26bmttfmh9h6qcdulo8fuonm0dmrc.apps.googleusercontent.com}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - deepfake-network
     healthcheck:
