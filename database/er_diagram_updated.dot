@@ -1,0 +1,49 @@
+digraph ERD {
+  graph [
+    rankdir=LR,
+    bgcolor="#031126",
+    pad="0.4",
+    nodesep="0.9",
+    ranksep="1.0",
+    splines=true,
+    fontname="Helvetica"
+  ];
+
+  node [
+    shape=record,
+    style="rounded,filled",
+    fillcolor="#111827",
+    color="#6b7280",
+    fontcolor="#e5e7eb",
+    fontsize=11,
+    fontname="Helvetica",
+    margin="0.08,0.06"
+  ];
+
+  edge [
+    color="#94a3b8",
+    fontcolor="#cbd5e1",
+    fontsize=10,
+    fontname="Helvetica",
+    arrowsize=0.8
+  ];
+
+  Users [label="{Users|PK UserID\lName\lEmail (UK)\lRole\lPasswordHash\lOperativeID (UK)\lCreatedAt\l}"];
+  Scans [label="{Scans|PK ScanID\lFK UserID\lFileHash (UK)\lMediaType\lStatus\lRiskScore\lConfidence\lFK VerdictID\lModelVersion\lCreatedAt\l}"];
+  VerdictTypes [label="{VerdictTypes|PK VerdictID\lVerdictName (UK)\lRiskMin\lRiskMax\l}"];
+  AuditLogs [label="{AuditLogs|PK AuditID\lFK UserID\lAction\lResource\lTimestamp\l}"];
+  Notifications [label="{Notifications|PK NotificationID\lFK UserID\lType\lMessage\lIsRead\lTimestamp\l}"];
+  EvidenceVault [label="{EvidenceVault|PK EvidenceID\lFK ScanID\lFilePath\lSHA256Hash (UK)\lCreatedAt\l}"];
+
+  label="SENTINEL - ER Diagram";
+  labelloc="t";
+  fontsize=20;
+  fontcolor="#f8fafc";
+  fontname="Helvetica-Bold";
+
+  Users -> Scans [taillabel="1", headlabel="M", label="submits", labeldistance=1.6];
+  Users -> AuditLogs [taillabel="1", headlabel="M", label="generates", labeldistance=1.8];
+  Users -> Notifications [taillabel="1", headlabel="M", label="receives", labeldistance=1.8];
+  VerdictTypes -> Scans [taillabel="1", headlabel="M", label="classifies", labeldistance=1.6];
+  Scans -> EvidenceVault [taillabel="1", headlabel="M", label="has", labeldistance=1.4];
+}

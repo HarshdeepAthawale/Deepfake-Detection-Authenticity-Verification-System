@@ -160,11 +160,137 @@ export const getUserById = async (userId) => {
   }
 };
 
+/**
+ * Update user profile information
+ * @param {string} userId - User ID
+ * @param {Object} profileData - Profile data to update (firstName, lastName, department)
+ * @returns {Object} Updated user object
+ */
+export const updateProfile = async (userId, profileData) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Only allow updating metadata fields, not sensitive ones
+    const { firstName, lastName, department } = profileData;
+
+    if (firstName) user.metadata.firstName = firstName;
+    if (lastName) user.metadata.lastName = lastName;
+    if (department) user.metadata.department = department;
+
+    await user.save({ validateBeforeSave: false });
+
+    logger.info(`User profile updated: ${user.operativeId}`);
+
+    return user.toJSON();
+  } catch (error) {
+    logger.error('Update profile error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Change user password
+ * @param {string} userId - User ID
+ * @param {string} currentPassword - Current password
+ * @param {string} newPassword - New password
+ * @returns {Object} Success response
+ */
+export const changePassword = async (userId, currentPassword, newPassword) => {
+  try {
+    const user = await User.findById(userId).select('+password');
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Block password change for Google OAuth users
+    if (user.authProvider === 'google') {
+      throw new Error('Password management is handled by Google. Please use Google account settings.');
+    }
+
+    // Verify current password
+    const isPasswordValid = await user.comparePassword(currentPassword);
+    if (!isPasswordValid) {
+      throw new Error('Current password is incorrect');
+    }
+
+    // Check if new password is different from current
+    const isSamePassword = await user.comparePassword(newPassword);
+    if (isSamePassword) {
+      throw new Error('New password must be different from current password');
+    }
+
+    // Validate password length
+    if (newPassword.length < 6) {
+      throw new Error('New password must be at least 6 characters');
+    }
+
+    // Set new password (pre-save hook will hash it)
+    user.password = newPassword;
+    await user.save({ validateBeforeSave: false });
+
+    logger.info(`Password changed for user: ${user.operativeId}`);
+
+    return {
+      success: true,
+      message: 'Password changed successfully',
+    };
+  } catch (error) {
+    logger.error('Change password error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update notification preferences
+ * @param {string} userId - User ID
+ * @param {Object} preferences - Notification preferences
+ * @returns {Object} Updated preferences
+ */
+export const updateNotificationPreferences = async (userId, preferences) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Update notification preferences
+    const {
+      emailEnabled,
+      emailOnDeepfake,
+      emailOnAll,
+      inAppEnabled,
+    } = preferences;
+
+    if (emailEnabled !== undefined) user.notificationPreferences.emailEnabled = emailEnabled;
+    if (emailOnDeepfake !== undefined) user.notificationPreferences.emailOnDeepfake = emailOnDeepfake;
+    if (emailOnAll !== undefined) user.notificationPreferences.emailOnAll = emailOnAll;
+    if (inAppEnabled !== undefined) user.notificationPreferences.inAppEnabled = inAppEnabled;
+
+    await user.save({ validateBeforeSave: false });
+
+    logger.info(`Notification preferences updated for user: ${user.operativeId}`);
+
+    return {
+      success: true,
+      data: user.notificationPreferences,
+    };
+  } catch (error) {
+    logger.error('Update notification preferences error:', error);
+    throw error;
+  }
+};
+
 export default {
   generateToken,
   verifyToken,
   authenticateUser,
   registerUser,
   getUserById,
+  updateProfile,
+  changePassword,
+  updateNotificationPreferences,
 };
 

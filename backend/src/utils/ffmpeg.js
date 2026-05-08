@@ -78,6 +78,54 @@ export const extractFrames = async (inputPath, outputDir, frameRate = 1, maxFram
 };
 
 /**
+ * Extract frames at scene-change boundaries from a video file.
+ * Uses FFmpeg's scene-change detection filter to select only the most
+ * visually distinct frames, giving the ML model diverse, information-rich inputs.
+ *
+ * @param {string} inputPath - Path to input video file
+ * @param {string} outputDir - Directory to save extracted frames
+ * @param {number} threshold - Scene-change sensitivity 0–1 (default: 0.3 = 30% difference)
+ * @param {number} maxFrames - Hard cap on frames extracted (default: 60)
+ * @returns {Promise<string[]>} Array of frame file paths (sorted)
+ */
+export const extractSceneChangeFrames = async (inputPath, outputDir, threshold = 0.3, maxFrames = 60) => {
+  return new Promise((resolve, reject) => {
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const clampedThreshold = Math.max(0.05, Math.min(0.95, threshold));
+
+    ffmpeg(inputPath)
+      .outputOptions([
+        // select filter: emit frame only when scene-change score exceeds threshold
+        `-vf select='gt(scene,${clampedThreshold})',setpts=N/FRAME_RATE/TB`,
+        '-vsync vfr',   // variable frame-rate — required when using the select filter
+        '-q:v 2',       // high quality JPEG
+        `-vframes ${maxFrames}`,
+      ])
+      .output(join(outputDir, 'scene_%04d.jpg'))
+      .on('start', (cmd) => {
+        logger.debug(`FFmpeg scene-change extraction started: ${cmd}`);
+      })
+      .on('end', () => {
+        const files = fs.readdirSync(outputDir);
+        const frameFiles = files
+          .filter((f) => f.startsWith('scene_') && f.endsWith('.jpg'))
+          .map((f) => join(outputDir, f))
+          .sort();
+        logger.info(`Scene-change extraction: ${frameFiles.length} frames (threshold=${clampedThreshold})`);
+        resolve(frameFiles);
+      })
+      .on('error', (err) => {
+        logger.error('FFmpeg scene-change extraction error:', err);
+        reject(err);
+      })
+      .run();
+  });
+};
+
+/**
  * Extract audio from video file
  * @param {string} inputPath - Path to input video file
  * @param {string} outputPath - Path to save extracted audio
@@ -205,6 +253,7 @@ export const extractGPSFromImage = async (inputPath) => {
 
 export default {
   extractFrames,
+  extractSceneChangeFrames,
   extractAudio,
   getMediaMetadata,
   normalizeMedia,

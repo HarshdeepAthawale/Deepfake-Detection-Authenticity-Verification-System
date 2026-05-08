@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { generateFileHash } from '../security/encryption.js';
-import { extractFrames, extractAudio, getMediaMetadata, normalizeMedia, extractGPSFromImage } from '../utils/ffmpeg.js';
+import { extractFrames, extractSceneChangeFrames, extractAudio, getMediaMetadata, normalizeMedia, extractGPSFromImage } from '../utils/ffmpeg.js';
 import logger from '../utils/logger.js';
 import { getPerceptionParams } from '../learning/adaptive-perception.js';
 
@@ -66,6 +66,7 @@ export const processMedia = async (filePath, scanId) => {
       mediaType: isVideo ? 'VIDEO' : isAudio ? 'AUDIO' : isImage ? 'IMAGE' : 'UNKNOWN',
       duration: metadata.format?.duration || 0,
       size: fileBuffer.length,
+      maxFrames: null, // populated below for video — forwarded to ML service
       metadata: {
         format: metadata.format?.format_name,
         bitrate: metadata.format?.bit_rate,
@@ -98,7 +99,7 @@ export const processMedia = async (filePath, scanId) => {
     if (isVideo) {
       try {
         const framesDir = path.join(processingDir, 'frames');
-        
+
         // Adaptive frame sampling based on video duration (uses learned params if available)
         const duration = perceptionResults.duration || 0;
         let frameRate = 4; // Default 4 fps
@@ -114,7 +115,7 @@ export const processMedia = async (filePath, scanId) => {
             logger.info(`[PERCEPTION_AGENT] Using learned sampling params for duration=${duration}s`);
           }
         } catch {
-          // Fallback to hardcoded defaults
+          // Fallback to adaptive defaults based on duration
           if (duration <= 10) {
             frameRate = 4; maxFrames = 40;
           } else if (duration <= 30) {
@@ -127,9 +128,33 @@ export const processMedia = async (filePath, scanId) => {
         }
 
         logger.info(`[PERCEPTION_AGENT] Adaptive sampling: duration=${duration}s, fps=${frameRate}, maxFrames=${maxFrames}`);
-        
-        const frames = await extractFrames(filePath, framesDir, frameRate, maxFrames);
+
+        let frames;
+
+        if (duration > 30) {
+          // For longer videos, scene-change detection picks the most visually distinct frames,
+          // giving the ML model diverse content rather than uniformly-sampled redundant frames.
+          try {
+            const sceneDir = path.join(processingDir, 'frames');
+            frames = await extractSceneChangeFrames(filePath, sceneDir, 0.3, maxFrames);
+            logger.info(`[PERCEPTION_AGENT] Scene-change extraction: ${frames.length} frames`);
+
+            // Fall back to uniform sampling if too few scene-change frames were found
+            if (frames.length < 5) {
+              logger.warn(`[PERCEPTION_AGENT] Scene detection yielded only ${frames.length} frames — falling back to uniform sampling`);
+              frames = await extractFrames(filePath, framesDir, frameRate, maxFrames);
+            }
+          } catch (sceneErr) {
+            logger.warn(`[PERCEPTION_AGENT] Scene-change extraction failed (${sceneErr.message}) — falling back to uniform sampling`);
+            frames = await extractFrames(filePath, framesDir, frameRate, maxFrames);
+          }
+        } else {
+          // Short videos: uniform sampling is fine and faster
+          frames = await extractFrames(filePath, framesDir, frameRate, maxFrames);
+        }
+
         perceptionResults.extractedFrames = frames;
+        perceptionResults.maxFrames = frames.length; // tell ML service exactly how many frames we extracted
         logger.info(`[PERCEPTION_AGENT] Extracted ${frames.length} frames`);
       } catch (error) {
         logger.warn(`[PERCEPTION_AGENT] Frame extraction failed: ${error.message}`);

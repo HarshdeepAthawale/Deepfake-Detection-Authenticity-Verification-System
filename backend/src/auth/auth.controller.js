@@ -3,7 +3,7 @@
  * Handles authentication-related HTTP requests
  */
 
-import { authenticateUser, registerUser } from './auth.service.js';
+import { authenticateUser, registerUser, updateProfile, changePassword, updateNotificationPreferences } from './auth.service.js';
 import { authenticateWithGoogle } from './google-auth.service.js';
 import logger from '../utils/logger.js';
 import config from '../config/env.js';
@@ -195,10 +195,157 @@ export const googleAuth = async (req, res) => {
   }
 };
 
+/**
+ * Update user profile
+ * PATCH /api/auth/me
+ */
+export const updateProfileHandler = async (req, res) => {
+  try {
+    const { firstName, lastName, department } = req.body;
+
+    // Validation
+    if (!firstName && !lastName && !department) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'At least one field must be provided',
+      });
+    }
+
+    // Update profile
+    const updatedUser = await updateProfile(req.user.id, {
+      firstName,
+      lastName,
+      department,
+    });
+
+    logger.info(`Profile updated for user: ${req.user.id}`);
+
+    // Audit log
+    await logAudit(req, 'profile.update', {
+      firstName,
+      lastName,
+      department,
+    }, 'success');
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: { user: updatedUser },
+    });
+  } catch (error) {
+    logger.error('Update profile error:', error);
+    res.status(500).json({
+      error: 'Update failed',
+      message: error.message || 'An error occurred',
+    });
+  }
+};
+
+/**
+ * Change user password
+ * PATCH /api/auth/me/password
+ */
+export const changePasswordHandler = async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    // Validation
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'Current password, new password, and confirmation are required',
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'New passwords do not match',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'New password must be at least 6 characters',
+      });
+    }
+
+    // Change password
+    await changePassword(req.user.id, currentPassword, newPassword);
+
+    logger.info(`Password changed for user: ${req.user.id}`);
+
+    // Audit log
+    await logAudit(req, 'profile.password_change', {}, 'success');
+
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully',
+    });
+  } catch (error) {
+    logger.error('Change password error:', error);
+
+    const statusCode = error.message.includes('not found')
+      ? 404
+      : error.message.includes('Google')
+      ? 400
+      : error.message.includes('incorrect') || error.message.includes('must be different')
+      ? 400
+      : 500;
+
+    res.status(statusCode).json({
+      error: 'Password change failed',
+      message: error.message || 'An error occurred',
+    });
+  }
+};
+
+/**
+ * Update notification preferences
+ * PATCH /api/auth/me/notifications
+ */
+export const updateNotificationsHandler = async (req, res) => {
+  try {
+    const preferences = req.body;
+
+    // Validation
+    if (Object.keys(preferences).length === 0) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: 'At least one preference must be provided',
+      });
+    }
+
+    // Update preferences
+    const result = await updateNotificationPreferences(req.user.id, preferences);
+
+    logger.info(`Notification preferences updated for user: ${req.user.id}`);
+
+    // Audit log
+    await logAudit(req, 'profile.notification_update', preferences, 'success');
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification preferences updated',
+      data: result.data,
+    });
+  } catch (error) {
+    logger.error('Update notification preferences error:', error);
+    res.status(500).json({
+      error: 'Update failed',
+      message: error.message || 'An error occurred',
+    });
+  }
+};
+
 export default {
   login,
   register,
   getCurrentUser,
   googleAuth,
+  updateProfileHandler,
+  changePasswordHandler,
+  updateNotificationsHandler,
 };
 

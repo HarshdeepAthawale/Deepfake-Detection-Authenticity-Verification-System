@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { login, register, getCurrentUser, googleAuth } from './auth.controller.js';
+import { login, register, getCurrentUser, googleAuth, updateProfileHandler, changePasswordHandler, updateNotificationsHandler } from './auth.controller.js';
 import { authenticate } from './auth.middleware.js';
 
 const router = express.Router();
@@ -36,6 +36,27 @@ router.get('/me', authenticate, getCurrentUser);
  * @access  Public
  */
 router.post('/google', googleAuth);
+
+/**
+ * @route   PATCH /api/auth/me
+ * @desc    Update user profile (firstName, lastName, department)
+ * @access  Private
+ */
+router.patch('/me', authenticate, updateProfileHandler);
+
+/**
+ * @route   PATCH /api/auth/me/password
+ * @desc    Change user password
+ * @access  Private
+ */
+router.patch('/me/password', authenticate, changePasswordHandler);
+
+/**
+ * @route   PATCH /api/auth/me/notifications
+ * @desc    Update notification preferences
+ * @access  Private
+ */
+router.patch('/me/notifications', authenticate, updateNotificationsHandler);
 
 export default router;
 

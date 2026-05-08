@@ -1,0 +1,180 @@
+================================================================================
+                    SENTINEL-X DOCKER QUICK REFERENCE
+                Deepfake Detection & Authenticity Verification
+================================================================================
+
+QUICK START
+───────────────────────────────────────────────────────────────────────────────
+Linux/macOS:        ./docker-start.sh
+Windows:            docker-start.bat
+Manual:             docker compose up
+
+PROJECT DIRECTORY:  http://localhost:3002
+BACKEND API:        http://localhost:3001/api
+ML SERVICE:         http://localhost:5001/health
+
+
+COMMON COMMANDS
+───────────────────────────────────────────────────────────────────────────────
+Start services          docker compose up
+Start (background)      docker compose up -d
+View logs              docker compose logs -f
+Stop services          docker compose down
+Reset all data         docker compose down -v && docker compose up
+Rebuild services       docker compose up --build
+View status            docker compose ps
+Service-specific logs  docker compose logs -f backend
+
+
+DEFAULT LOGIN CREDENTIALS
+───────────────────────────────────────────────────────────────────────────────
+Admin     admin@sentinel.local        AdminPass123!
+Analyst   analyst@sentinel.local      AnalystPass123!
+Operative operative@sentinel.local    OperativePass123!
+
+
+PORTS
+───────────────────────────────────────────────────────────────────────────────
+Frontend              3002  (Next.js)
+Backend API           3001  (Node.js)
+ML Service            5001  (Flask)
+MongoDB               27019 (Docker: 27017)
+Redis                 6380  (Docker: 6379)
+
+
+SERVICES & STARTUP ORDER
+───────────────────────────────────────────────────────────────────────────────
+1. MongoDB     (Database)      — Health: mongosh ping
+2. Redis       (Cache/Queue)   — Health: redis-cli ping
+3. ML Service  (Detection)     — Auto-starts (models download 2-3 min first time)
+4. Backend API (Express.js)    — Waits for MongoDB, Redis, ML Service
+5. Frontend    (Next.js)       — Waits for Backend
+
+All services must be "healthy" before app is fully functional.
+
+
+TROUBLESHOOTING
+───────────────────────────────────────────────────────────────────────────────
+Services won't start
+  → Check logs: docker compose logs -f
+  → Verify ports available: lsof -i :3001 :3002 :5001 :6380 :27019
+
+Port conflicts
+  → Kill process: kill -9 <PID>
+  → Or change ports in docker-compose.yml
+
+ML models not loading
+  → Normal on first startup (2-3 minutes)
+  → Watch logs: docker compose logs -f ml-service
+
+Frontend blank page
+  → Rebuild: docker compose up --build frontend
+  → Check logs: docker compose logs -f frontend
+
+Health checks failing
+  → Check status: docker ps
+  → Test manually: docker exec deepfake-backend curl http://localhost:3001/health
+
+
+VOLUMES & DATA PERSISTENCE
+───────────────────────────────────────────────────────────────────────────────
+mongo-data        MongoDB databases
+redis-data        Redis data
+uploads           Media files & training data
+ml-checkpoints    ML model fine-tuning
+backend_logs      Application logs
+
+Data persists between restarts. Reset with: docker compose down -v
+
+
+ENVIRONMENT CONFIGURATION (.env.local)
+───────────────────────────────────────────────────────────────────────────────
+Required:
+  JWT_SECRET         JWT signing key (32+ chars)
+  ENCRYPTION_KEY     Data encryption key (32 chars)
+  ENCRYPTION_IV      Encryption IV (16 chars)
+
+Optional:
+  NEXT_PUBLIC_GOOGLE_CLIENT_ID    Google OAuth
+
+Auto-configured for Docker:
+  MONGODB_URI        mongodb://mongodb:27017/deepfake-detection
+  REDIS_URL          redis://redis:6379
+  ML_SERVICE_URL     http://ml-service:5000
+
+
+DOCUMENTATION
+───────────────────────────────────────────────────────────────────────────────
+Complete Setup Guide     → DOCKER_SETUP.md (40+ sections)
+Pre-flight Checklist     → DOCKER_PRE_FLIGHT_CHECKLIST.md
+Deployment Summary       → DOCKER_DEPLOYMENT_SUMMARY.md (this file)
+Project README           → README.md
+
+
+SYSTEM REQUIREMENTS
+───────────────────────────────────────────────────────────────────────────────
+Minimum:  4GB RAM, 2 cores, 20GB disk, Docker 20.10+, Docker Compose 2.0+
+Recommended: 8GB+ RAM, 4+ cores, 50GB disk, Latest Docker versions
+
+
+PRODUCTION DEPLOYMENT
+───────────────────────────────────────────────────────────────────────────────
+1. Generate strong secrets:
+   openssl rand -base64 32  # JWT_SECRET
+   openssl rand -base64 32  # ENCRYPTION_KEY
+   openssl rand -base64 16  # ENCRYPTION_IV
+
+2. Update .env.local with:
+   NODE_ENV=production
+   LOG_LEVEL=error
+   FRONTEND_URL=https://your-domain.com
+   MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/db
+
+3. Start: docker compose up -d
+
+See DOCKER_DEPLOYMENT_SUMMARY.md for full production guide.
+
+
+QUICK VERIFICATION
+───────────────────────────────────────────────────────────────────────────────
+Check Docker installed:    docker --version
+Check Compose installed:   docker compose version
+Check env file:            ls -l .env.local
+Verify compose file:       ls -l docker-compose.yml
+Test all at once:          ./docker-start.sh  (Linux/macOS)
+
+
+KEY FILES
+───────────────────────────────────────────────────────────────────────────────
+docker-compose.yml         Service configuration
+.env.local                  Environment variables
+Dockerfile                  Frontend build config
+backend/Dockerfile         Backend build config
+ml-service/Dockerfile      ML service build config
+docker-start.sh            Linux/macOS startup script
+docker-start.bat           Windows startup script
+
+
+PERFORMANCE NOTES
+───────────────────────────────────────────────────────────────────────────────
+Video analysis:   ~13 seconds (94.44% accuracy)
+Audio analysis:   ~2 seconds (92.86% accuracy)
+Image analysis:   ~300ms
+Models:           ~500MB (auto-download on first run)
+First startup:    2-3 minutes (model downloads)
+
+Enable GPU for 10-50x faster inference (see DOCKER_SETUP.md)
+
+
+SUPPORT
+───────────────────────────────────────────────────────────────────────────────
+1. Check logs:        docker compose logs -f
+2. Verify health:     docker compose ps
+3. Test API:          curl http://localhost:3001/health
+4. Reset + restart:   docker compose down -v && docker compose up
+5. Read docs:         See DOCKER_SETUP.md for detailed troubleshooting
+
+================================================================================
+                        SENTINEL-X v4.1.0
+                         Ready to Deploy! 🚀
+================================================================================
