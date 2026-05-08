@@ -155,7 +155,3 @@ Proprietary. All rights reserved. See LICENSE for details.
 
 - **Issues**: [GitHub Issues](https://github.com/HarshdeepAthawale/Deepfake-Detection-Authenticity-Verification-System/issues)
 - **Documentation**: [docs/](docs/)
-
----
-
-**Built for tactical field deployment. No shortcuts taken.**
