@@ -107,40 +107,6 @@ pip install -r requirements.txt && python app.py
 | **SUSPICIOUS** | 40-74% | Moderate indicators |
 | **AUTHENTIC** | <40% | Likely genuine |
 
-## API Endpoints
-
-### Authentication
-```
-POST   /api/auth/login        - Login
-POST   /api/auth/register     - Register
-GET    /api/auth/me           - Get current user
-```
-
-### Scans
-```
-POST   /api/scans/upload      - Upload single file
-POST   /api/scans/batch       - Upload multiple (max 50)
-GET    /api/scans/history     - Scan history
-GET    /api/scans/:id         - Get scan details
-DELETE /api/scans/:id         - Delete scan
-```
-
-### Admin
-```
-GET    /api/admin/stats       - System stats
-GET    /api/admin/audit       - Audit logs
-GET    /api/admin/ml/health   - ML service health
-GET    /api/users             - List users
-POST   /api/users             - Create user
-```
-
-### Reports
-```
-GET    /api/reports/scans/:id/pdf   - Export PDF
-GET    /api/reports/scans/:id/json  - Export JSON
-GET    /api/reports/scans/csv       - Bulk CSV
-```
-
 ## Security
 
 - **JWT Authentication**: 24h expiry, 7d refresh tokens
