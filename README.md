@@ -123,7 +123,9 @@ User Upload → Frontend → Backend API → Perception Agent (extract frames/me
 
 ## Quick Start
 
-### Using Docker Compose (Recommended)
+### Using Docker Compose (Recommended) 🐳
+
+**Easiest way to get started** — all services in one command:
 
 ```bash
 # Clone the repository
@@ -131,16 +133,34 @@ git clone https://github.com/your-org/deepfake-detection-system.git
 cd deepfake-detection-system
 
 # Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
+docker compose up
 
 # Access the application
-# Frontend: http://localhost:3002
-# Backend API: http://localhost:3001
-# ML Service: http://localhost:5001
+# Frontend:    http://localhost:3002
+# Backend API: http://localhost:3001/api
+# ML Service:  http://localhost:5001/health
 ```
+
+✅ MongoDB, Redis, Backend, ML Service, and Frontend all start automatically.
+
+#### For Production / Background Mode
+```bash
+docker compose up -d      # Start in background
+docker compose logs -f    # Watch logs (optional)
+docker compose down       # Stop all services
+docker compose down -v    # Stop + remove volumes (reset data)
+```
+
+#### Login Credentials
+Default test users (pre-seeded on first run):
+- **Admin**: `admin@sentinel.local` / `AdminPass123!`
+- **Analyst**: `analyst@sentinel.local` / `AnalystPass123!`
+- **Operative**: `operative@sentinel.local` / `OperativePass123!`
+
+#### Need Help?
+- **Pre-flight checklist**: See [`DOCKER_PRE_FLIGHT_CHECKLIST.md`](./DOCKER_PRE_FLIGHT_CHECKLIST.md)
+- **Detailed Docker guide**: See [`DOCKER_SETUP.md`](./DOCKER_SETUP.md)
+- **Troubleshooting**: Check the Docker docs in DOCKER_SETUP.md or run `docker compose logs`
 
 ---
 

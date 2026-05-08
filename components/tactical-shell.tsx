@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { Shield, Activity, Terminal, Lock, LogOut, Settings, BarChart3 } from "lucide-react"
+import { Shield, Activity, Terminal, Lock, LogOut, Settings, BarChart3, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
@@ -55,6 +55,7 @@ export function TacticalShell({
               <NavItem icon={<Activity size={18} />} label="Audit Log" active={activeTab === "audit"} href="/audit" />
             </>
           )}
+          <NavItem icon={<User size={18} />} label="Manage My Account" active={activeTab === "profile"} href="/profile" />
           {user?.role === "admin" && (
             <NavItem icon={<Settings size={18} />} label="Admin Panel" active={activeTab === "admin"} href="/admin" />
           )}
