@@ -1,684 +1,185 @@
 # SENTINEL - Deepfake Detection & Authenticity Verification System
 
-A full-stack AI-powered platform for detecting deepfake media using machine learning and agentic AI orchestration. Analyzes images, videos, and audio to identify AI-generated or manipulated content with confidence scores, detailed explanations, and forensic evidence.
-
-## Table of Contents
-
-- [Features](#features)
-- [Technology Stack](#technology-stack)
-- [Architecture](#architecture)
-- [Quick Start](#quick-start)
-- [Installation](#installation)
-- [API Reference](#api-reference)
-- [Agentic AI Pipeline](#agentic-ai-pipeline)
-- [ML Model](#ml-model)
-- [Security](#security)
-- [Deployment](#deployment)
-- [Project Structure](#project-structure)
-- [Contributing](#contributing)
-- [Documentation](#documentation)
-- [License](#license)
-
----
+A full-stack AI-powered platform for detecting deepfake media using machine learning and agentic AI orchestration. Detects AI-generated or manipulated content in images, videos, and audio with confidence scores and forensic analysis.
 
 ## Features
 
-### Core Detection Capabilities
-- **4-Agent AI Pipeline**: Perception, Detection, Compression, and Cognitive agents for comprehensive analysis
-- **Advanced ML Model**: SiglIP-based deepfake detector (94.44% accuracy) with adaptive frame sampling
-- **Multi-Modal Analysis**: Supports images (JPEG, PNG), videos (MP4, AVI, MOV, WebM), and audio (MP3, WAV)
-- **Batch Processing**: Upload and analyze up to 50 files simultaneously
-- **Real-time Progress**: WebSocket-based live scan updates and progress tracking
-- **GPU Acceleration**: Optional CUDA support for 10-50x faster inference
-
-### Analysis Metrics
-- **Risk Score**: Overall manipulation probability (0-100%)
-- **Confidence Score**: Model certainty in prediction
-- **GAN Fingerprint Detection**: Identifies GAN-generated artifacts
-- **Temporal Consistency**: Frame-to-frame coherence analysis for videos
-- **Compression Artifact Analysis**: Detects suspicious encoding patterns
-- **GPS/EXIF Extraction**: Extracts location metadata from images
-
-### Platform Features
-- **RBAC Authentication**: JWT-based auth with Admin, Operative, and Analyst roles
-- **Evidence Vault**: Secure storage with SHA-256 integrity verification
-- **Export Options**: PDF reports, JSON data export, CSV bulk export
-- **Audit Logging**: Complete action trail for compliance
-- **Real-time Dashboard**: Live analytics, scan statistics, and system monitoring
-- **Admin Panel**: User management, ML health monitoring, system configuration
-
----
+- **4-Agent AI Pipeline**: Perception, Detection, Compression, and Cognitive agents
+- **Advanced ML Model**: SiglIP-based detector with 94.44% accuracy
+- **Multi-Modal**: Images (JPEG, PNG), videos (MP4, AVI, MOV, WebM), audio (MP3, WAV)
+- **Batch Processing**: Analyze up to 50 files simultaneously
+- **Real-time Updates**: WebSocket-based progress tracking
+- **GPU Support**: Optional CUDA for 10-50x faster inference
+- **RBAC Authentication**: Admin, Operative, and Analyst roles
+- **Evidence Vault**: Secure storage with integrity verification
+- **Export Options**: PDF, JSON, and CSV export formats
+- **Admin Dashboard**: User management, ML health monitoring, audit logs
 
 ## Technology Stack
 
-| Layer | Technologies |
-|-------|-------------|
-| **Frontend** | Next.js 16, React 19, TypeScript, Tailwind CSS, Radix UI, Socket.IO Client |
-| **Backend** | Node.js, Express.js, MongoDB, JWT, FFmpeg, Winston, Bull (Queue) |
-| **ML Service** | Python 3.9+, Flask, HuggingFace Transformers, SiglIP, MTCNN, Pillow, NumPy |
-| **Infrastructure** | Docker, Docker Compose, Redis (Cache/Queue), Nginx |
+| Layer | Tech |
+|-------|------|
+| **Frontend** | Next.js 16, React 19, TypeScript, Tailwind CSS |
+| **Backend** | Node.js, Express.js, MongoDB, JWT, FFmpeg |
+| **ML Service** | Python 3.9+, Flask, HuggingFace, SiglIP |
+| **Infrastructure** | Docker, Docker Compose, Redis, Nginx |
 
----
+## Quick Start
+
+### Docker (Recommended)
+```bash
+git clone https://github.com/HarshdeepAthawale/Deepfake-Detection-Authenticity-Verification-System.git
+cd Deepfake-Detection-Authenticity-Verification-System
+
+docker-compose up -d
+
+# Access
+# Frontend: http://localhost:3002
+# Backend: http://localhost:3001
+# ML Service: http://localhost:5001
+```
+
+### Manual Setup
+
+**Prerequisites**: Node.js 18+, Python 3.10+, MongoDB 7.0+, Redis 7+, FFmpeg
+
+**Frontend**:
+```bash
+npm install && npm run dev
+```
+
+**Backend**:
+```bash
+cd backend && npm install && npm run dev
+```
+
+**ML Service**:
+```bash
+cd ml-service
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt && python app.py
+```
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Client Layer                                │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │              Next.js Frontend (Port 3002)                    │   │
-│  │         React 19 + TypeScript + Tailwind CSS                 │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-                                │
-                    HTTP REST + WebSocket
-                                │
-┌─────────────────────────────────────────────────────────────────────┐
-│                          API Layer                                  │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │            Express.js Backend (Port 3001)                    │   │
-│  │              REST API + Socket.IO Server                     │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                │                                    │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │                   4-Agent AI Pipeline                         │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌───────────┐  ┌──────────┐    │  │
-│  │  │Perception│→ │Detection │→ │Compression│→ │Cognitive │    │  │
-│  │  │  Agent   │  │  Agent   │  │   Agent   │  │  Agent   │    │  │
-│  │  └──────────┘  └──────────┘  └───────────┘  └──────────┘    │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                                │
-                          HTTP REST
-                                │
-┌─────────────────────────────────────────────────────────────────────┐
-│                         ML Layer                                    │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │            Flask ML Service (Port 5000)                      │   │
-│  │    SiglIP Deepfake Detector v1.0.0 | 94.44% Accuracy         │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-                                │
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Data Layer                                   │
-│  ┌───────────────┐  ┌───────────────┐  ┌───────────────────────┐   │
-│  │   MongoDB     │  │    Redis      │  │    File Storage       │   │
-│  │  (Port 27017) │  │  (Port 6379)  │  │     (./uploads)       │   │
-│  │  Scans, Users │  │ Cache, Queue  │  │  Media, Frames, Audio │   │
-│  └───────────────┘  └───────────────┘  └───────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
+Client → Frontend (Next.js, Port 3002)
+           ↓ HTTP/WebSocket
+         Backend (Express, Port 3001)
+           ↓ 4-Agent Pipeline
+         ML Service (Flask, Port 5001)
+           ↓
+         MongoDB, Redis, File Storage
 ```
-
-### Service Communication Flow
-
-```
-User Upload → Frontend → Backend API → Perception Agent (extract frames/metadata)
-                                     → Detection Agent (ML inference)
-                                     → Compression Agent (quality analysis)
-                                     → Cognitive Agent (generate verdict)
-                                     → Save Results → WebSocket Update → Frontend
-```
-
----
-
-## Quick Start
-
-### Using Docker Compose (Recommended)
-
-```bash
-# Clone the repository
-git clone https://github.com/your-org/deepfake-detection-system.git
-cd deepfake-detection-system
-
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Access the application
-# Frontend: http://localhost:3002
-# Backend API: http://localhost:3001
-# ML Service: http://localhost:5001
-```
-
----
-
-## Installation
-
-### Prerequisites
-
-- **Node.js** 18+ (ES Modules support)
-- **Python** 3.10+
-- **MongoDB** 7.0+ (local or Atlas)
-- **Redis** 7+ (optional, for caching/queue)
-- **FFmpeg** (for media processing)
-- **Docker** (optional, recommended)
-
-### Manual Installation
-
-#### 1. Frontend Setup
-
-```bash
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-
-# Build for production
-npm run build
-npm start
-```
-
-#### 2. Backend Setup
-
-```bash
-cd backend
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Start production server
-npm start
-```
-
-#### 3. ML Service Setup
-
-```bash
-cd ml-service
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Start the service
-python app.py
-```
-
-#### 4. Install FFmpeg
-
-**macOS:**
-```bash
-brew install ffmpeg
-```
-
-**Ubuntu/Debian:**
-```bash
-sudo apt-get install ffmpeg
-```
-
-**Windows:**
-```bash
-choco install ffmpeg
-```
-
----
-
-## API Reference
-
-### Authentication
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/login` | Login with email/password |
-| POST | `/api/auth/register` | Register new user |
-| POST | `/api/auth/google` | Google OAuth login |
-| GET | `/api/auth/me` | Get current user |
-
-### Scans
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/scans/upload` | Upload single file for analysis |
-| POST | `/api/scans/batch` | Upload multiple files (max 50) |
-| GET | `/api/scans/history` | Get paginated scan history |
-| GET | `/api/scans/:id` | Get scan details |
-| DELETE | `/api/scans/:id` | Delete scan (admin only) |
-| PATCH | `/api/scans/:id/tags` | Update scan tags |
-| POST | `/api/scans/:id/share` | Share scan with users |
-| POST | `/api/scans/:id/comments` | Add comment to scan |
-
-### Admin
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/admin/stats` | System statistics |
-| GET | `/api/admin/audit` | Audit logs |
-| GET | `/api/admin/ml/health` | ML service health |
-| GET | `/api/users` | List all users |
-| POST | `/api/users` | Create user |
-| PUT | `/api/users/:id` | Update user |
-| DELETE | `/api/users/:id` | Delete user |
-
-### Reports
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/reports/scans/:id/pdf` | Export scan as PDF |
-| GET | `/api/reports/scans/:id/json` | Export scan as JSON |
-| GET | `/api/reports/scans/csv` | Bulk CSV export |
-
-### Health
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Backend health check |
-| GET | `ML_SERVICE_URL/health` | ML service health check |
-
-For complete API documentation with request/response examples, see [docs/API.md](docs/API.md).
-
----
-
-## Agentic AI Pipeline
-
-The system uses a 4-agent pipeline for comprehensive deepfake analysis:
-
-### 1. Perception Agent
-**Purpose**: Media preprocessing and feature extraction
-
-- **Adaptive Frame Extraction**: Dynamic sampling based on video duration
-  - Short videos (≤10s): 4 fps, max 40 frames
-  - Medium videos (≤30s): 3 fps, max 90 frames
-  - Long videos (≤60s): 2 fps, max 120 frames
-  - Very long videos (>60s): 1 fps, max 120 frames
-- Extracts audio tracks (PCM 16-bit, 44.1kHz stereo)
-- Generates SHA-256 file hash for integrity
-- Extracts media metadata (codec, bitrate, resolution, duration)
-- Extracts GPS coordinates from EXIF data (images)
-
-### 2. Detection Agent
-**Purpose**: ML inference and score calculation
-
-- Calls ML service for frame/image analysis
-- **Face Detection**: MTCNN-based face detection with quality assessment
-- **Confidence Penalty System**: Adjusts confidence based on face detection rate
-  - <30% faces detected: -20% confidence penalty
-  - <50% faces detected: -10% confidence penalty
-  - <70% faces detected: -5% confidence penalty
-- Aggregates predictions using statistical methods:
-  - **P90**: 90th percentile (robust to outliers)
-  - **Peak Risk**: Maximum probability across frames
-  - **Mean Risk**: Average probability
-- Calculates uncertainty estimation from variance
-- Weighted score aggregation based on confidence
-- **Model Versioning**: Tracks model version for each scan
-
-### 3. Compression Agent
-**Purpose**: Quality analysis and score adjustment
-
-- Analyzes media quality (bitrate, resolution, bits-per-pixel)
-- Detects compression artifacts and unusual codecs
-- Adjusts risk scores based on quality indicators
-- Reduces confidence for poor quality media
-
-### 4. Cognitive Agent
-**Purpose**: Human-readable report generation
-
-- Converts raw scores to intelligence report
-- Calculates dynamic thresholds based on context
-- Generates detailed explanations (6 categories):
-  - Facial manipulation indicators
-  - Localized deepfake segments
-  - Synthetic voice patterns
-  - GAN-generated artifacts
-  - Temporal inconsistencies
-  - Compression artifacts
-
-### Final Verdict
-
-| Verdict | Risk Score | Description |
-|---------|-----------|-------------|
-| **DEEPFAKE** | ≥ 75% | High probability of manipulation |
-| **SUSPICIOUS** | 40-74% | Moderate manipulation indicators |
-| **AUTHENTIC** | < 40% | Likely genuine media |
-
----
 
 ## ML Model
 
-### Model Specifications
-
 | Property | Value |
 |----------|-------|
-| **Model Name** | deepfake-detector-model-v1 |
-| **Version** | v1.0.0 |
-| **Architecture** | SiglIP-based Binary Classifier |
-| **Framework** | HuggingFace Transformers |
-| **Model ID** | prithivMLmods/deepfake-detector-model-v1 |
+| **Model** | SiglIP Deepfake Detector v1.0.0 |
 | **Accuracy** | 94.44% |
 | **Input Size** | 224×224 RGB |
-| **Output** | 2-class (Real/Fake) probabilities |
-| **Model Size** | 354 MB (safetensors) |
-| **Device Support** | CPU / CUDA GPU |
+| **Framework** | HuggingFace Transformers |
+| **Model ID** | prithivMLmods/deepfake-detector-model-v1 |
 
-### Recent Improvements (v1.0.0)
+## Verdict Thresholds
 
-#### 1. **Adaptive Frame Sampling** ✅
-- Dynamic frame extraction based on video duration
-- Optimizes coverage for long videos while reducing processing for short clips
-- Improves accuracy by 15-30% on long-form content
+| Verdict | Score | Description |
+|---------|-------|-------------|
+| **DEEPFAKE** | ≥75% | High probability of manipulation |
+| **SUSPICIOUS** | 40-74% | Moderate indicators |
+| **AUTHENTIC** | <40% | Likely genuine |
 
-#### 2. **Face Detection Confidence Penalty** ✅
-- MTCNN-based face detection with quality scoring
-- Automatic confidence adjustment when faces are not detected
-- Reduces false positives on non-face content by 40%
+## API Endpoints
 
-#### 3. **Model Versioning** ✅
-- Complete audit trail of model versions used
-- Enables A/B testing and performance comparison
-- Stored in scan metadata for compliance
-
-#### 4. **GPU Acceleration** ✅
-- Optional NVIDIA CUDA support (Dockerfile.gpu)
-- 10-50x faster inference on GPU vs CPU
-- Automatic fallback to CPU if GPU unavailable
-
-#### 5. **Optimized Model Loading** ✅
-- Docker volume mount for model files (no rebuild needed)
-- Faster container startup (33% improvement)
-- Automatic download from HuggingFace if model missing
-
-### Inference Pipeline
-
+### Authentication
 ```
-1. Input Processing
-   ├─ Video: Adaptive frame extraction (1-4 fps)
-   ├─ Image: Direct processing
-   └─ Batch: Up to 120 frames per video
-
-2. Face Detection (MTCNN)
-   ├─ Detect faces in each frame
-   ├─ Calculate face detection rate
-   └─ Crop to face region (if detected)
-
-3. Preprocessing
-   ├─ Resize to 224×224
-   ├─ Normalize pixel values
-   └─ Convert to tensor
-
-4. Model Inference
-   ├─ Forward pass through SiglIP classifier
-   ├─ Softmax probabilities
-   └─ Extract fake probability
-
-5. Score Aggregation
-   ├─ P90 (90th percentile)
-   ├─ Peak Risk (maximum)
-   ├─ Mean Risk (average)
-   └─ Confidence calculation
-
-6. Confidence Adjustment
-   ├─ Apply face detection penalty
-   ├─ Adjust for temporal consistency
-   └─ Final confidence score
+POST   /api/auth/login        - Login
+POST   /api/auth/register     - Register
+GET    /api/auth/me           - Get current user
 ```
 
-### Model Location
-
-The trained model is stored locally and mounted as a Docker volume:
+### Scans
 ```
-ml-service/model/
-├── config.json
-├── model.safetensors          # 354 MB
-├── preprocessor_config.json
-└── README.md
+POST   /api/scans/upload      - Upload single file
+POST   /api/scans/batch       - Upload multiple (max 50)
+GET    /api/scans/history     - Scan history
+GET    /api/scans/:id         - Get scan details
+DELETE /api/scans/:id         - Delete scan
 ```
 
-**Fallback**: If local model not found, automatically downloads from:
+### Admin
 ```
-https://huggingface.co/prithivMLmods/deepfake-detector-model-v1
-```
-
-### Performance Benchmarks
-
-| Metric | CPU (Intel i7) | GPU (RTX 3080) |
-|--------|----------------|----------------|
-| Single Image | ~800ms | ~50ms |
-| 30-frame Video | ~24s | ~1.5s |
-| 120-frame Video | ~96s | ~6s |
-| Batch (50 images) | ~40s | ~2.5s |
-
-### GPU Setup (Optional)
-
-To enable GPU acceleration:
-
-1. **Install NVIDIA Docker Runtime**:
-```bash
-# Install nvidia-docker2
-sudo apt-get install nvidia-docker2
-sudo systemctl restart docker
+GET    /api/admin/stats       - System stats
+GET    /api/admin/audit       - Audit logs
+GET    /api/admin/ml/health   - ML service health
+GET    /api/users             - List users
+POST   /api/users             - Create user
 ```
 
-2. **Uncomment GPU Service** in `docker-compose.yml`:
-```yaml
-ml-service-gpu:
-  build:
-    context: ./ml-service
-    dockerfile: Dockerfile.gpu
-  deploy:
-    resources:
-      reservations:
-        devices:
-          - driver: nvidia
-            count: 1
-            capabilities: [gpu]
+### Reports
 ```
-
-3. **Start with GPU**:
-```bash
-docker-compose up ml-service-gpu
+GET    /api/reports/scans/:id/pdf   - Export PDF
+GET    /api/reports/scans/:id/json  - Export JSON
+GET    /api/reports/scans/csv       - Bulk CSV
 ```
-
-### Model Versioning
-
-Every scan result includes model metadata:
-```json
-{
-  "result": {
-    "modelVersion": "v1.0.0",
-    "modelName": "deepfake-detector-model-v1",
-    "confidence": 85.5,
-    "riskScore": 72.3
-  }
-}
-```
-
-This enables:
-- **Audit Trail**: Know which model version produced each result
-- **A/B Testing**: Compare performance across model versions
-- **Debugging**: Identify model-specific issues
-- **Compliance**: Meet regulatory requirements
-
----
 
 ## Security
 
-### Authentication & Authorization
-
-- **JWT Authentication**: Tokens with 24h expiry, refresh tokens with 7d expiry
-- **Password Hashing**: bcrypt with 12 rounds
-- **Google OAuth 2.0**: Optional social login
-- **Role-Based Access Control (RBAC)**:
-
-| Role | Permissions |
-|------|-------------|
-| **Admin** | Full system access, user management, ML monitoring |
-| **Operative** | Upload scans, view own scans |
-| **Analyst** | View all scans, generate reports, export data |
-
-### Data Protection
-
-- **File Hashing**: SHA-256 integrity verification
-- **Encryption**: AES-256 for sensitive data
-- **Rate Limiting**: 100 requests per 15 minutes
+- **JWT Authentication**: 24h expiry, refresh tokens (7d)
+- **Password**: bcrypt with 12 rounds
+- **OAuth 2.0**: Google login support
+- **RBAC**: Admin, Operative, Analyst roles
+- **Data Protection**: SHA-256 hashing, AES-256 encryption
+- **Rate Limiting**: 100 req/15 min
 - **Security Headers**: Helmet.js (CSP, HSTS, XSS protection)
-- **Input Validation**: Zod schemas for all inputs
-- **CORS**: Configurable origin restrictions
+- **Input Validation**: Zod schemas
 - **Audit Trail**: Complete action logging
-
----
 
 ## Deployment
 
-### Docker Compose (Development/Production)
-
-```bash
-# Start all services
-docker-compose up -d
-
-# View service status
-docker-compose ps
-
-# Stop all services
-docker-compose down
-
-# Stop and remove volumes
-docker-compose down -v
-```
-
 ### Production Checklist
-
-- [ ] Change all default secrets in `.env`
-- [ ] Enable HTTPS with valid SSL certificate
-- [ ] Configure firewall (allow only 80, 443, 22)
-- [ ] Enable MongoDB authentication
-- [ ] Set up regular database backups
+- [ ] Update `.env` secrets
+- [ ] Enable HTTPS with SSL
+- [ ] Configure firewall (80, 443, 22)
+- [ ] Enable MongoDB auth
+- [ ] Set regular backups
 - [ ] Configure rate limiting
-- [ ] Enable security headers (Helmet)
 - [ ] Review CORS settings
-- [ ] Set up monitoring and alerts
-- [ ] Configure log rotation
-- [ ] Disable debug mode (`NODE_ENV=production`)
-
-For detailed deployment instructions, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
-
----
+- [ ] Set up monitoring
+- [ ] Disable debug mode
 
 ## Project Structure
 
 ```
 deepfake-detection-system/
-├── app/                          # Next.js pages (App Router)
-│   ├── dashboard/                # User dashboard
-│   ├── scanner/                  # Media scanner interface
-│   ├── vault/                    # Evidence vault
-│   ├── analytics/                # Analytics dashboard
-│   └── admin/                    # Admin panel
-│       └── ml/                   # ML service monitoring
-├── backend/                      # Express.js backend
-│   └── src/
-│       ├── agents/               # 4-Agent AI pipeline
-│       │   ├── perception.agent.js
-│       │   ├── detection.agent.js
-│       │   ├── compression.agent.js
-│       │   └── cognitive.agent.js
-│       ├── auth/                 # Authentication module
-│       ├── scans/                # Scan management
-│       ├── users/                # User management
-│       ├── admin/                # Admin routes
-│       ├── audit/                # Audit logging
-│       ├── reports/              # Report generation
-│       ├── notifications/        # Notification system
-│       ├── ml/                   # ML service client
-│       ├── security/             # Security utilities
-│       ├── utils/                # FFmpeg, logging, etc.
-│       └── config/               # Environment config
-├── ml-service/                   # Python ML service
-│   ├── app.py                    # Flask application
-│   ├── model_loader.py           # Model loading
-│   ├── preprocessing.py          # Image preprocessing
-│   ├── face_detection.py         # Face detection
-│   └── efficientnet_b0_ffpp_c23/ # Trained model
-├── components/                   # Reusable React components
-├── lib/                          # Frontend utilities
-│   └── api.ts                    # API client
-├── contexts/                     # React context providers
-├── docs/                         # Documentation
-│   ├── API.md                    # API reference
-│   ├── ARCHITECTURE.md           # System architecture
-│   └── DEPLOYMENT.md             # Deployment guide
-├── docker-compose.yml            # Docker orchestration
-├── Dockerfile                    # Frontend Dockerfile
-└── package.json                  # Frontend dependencies
+├── app/                    # Next.js pages
+├── backend/src/            # Express backend
+│   ├── agents/            # 4-Agent AI pipeline
+│   ├── auth/              # Authentication
+│   ├── scans/             # Scan management
+│   └── admin/             # Admin routes
+├── ml-service/            # Python ML service
+├── components/            # React components
+├── contexts/              # React context
+└── docker-compose.yml     # Docker config
 ```
-
----
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow ESLint/Prettier configurations
-- Write tests for new features
-- Update documentation for API changes
-- Use conventional commit messages
-
----
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [API Reference](docs/API.md) | Complete API documentation |
-| [Architecture](docs/ARCHITECTURE.md) | System architecture diagrams |
-| [Deployment](docs/DEPLOYMENT.md) | Production deployment guide |
-| [Docker Setup](DOCKER_SETUP.md) | Docker configuration guide |
-| [Backend README](backend/README.md) | Backend-specific documentation |
-| [ML Service README](ml-service/README.md) | ML service documentation |
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-**MongoDB connection failed:**
-```bash
-# Check MongoDB is running
-docker-compose ps mongodb
-docker-compose logs mongodb
-```
-
-**ML service unavailable:**
-```bash
-# Check ML service health
-curl http://localhost:5001/health
-docker-compose logs ml-service
-```
-
-**FFmpeg not found:**
-- Ensure FFmpeg is installed: `ffmpeg -version`
-- Set `FFMPEG_PATH` and `FFPROBE_PATH` in `.env` if not in PATH
-
-**File upload fails:**
-- Check file size limit (`MAX_FILE_SIZE`)
-- Verify MIME type is allowed
-- Ensure uploads directory exists and is writable
-
----
+2. Create feature branch: `git checkout -b feature/name`
+3. Commit: `git commit -m 'Add feature'`
+4. Push: `git push origin feature/name`
+5. Open Pull Request
 
 ## License
-This project is proprietary. All rights reserved.
-See the LICENSE file for details.
 
----
+This project is proprietary. All rights reserved. See LICENSE for details.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-org/deepfake-detection-system/issues)
+- **Issues**: [GitHub Issues](https://github.com/HarshdeepAthawale/Deepfake-Detection-Authenticity-Verification-System/issues)
 - **Documentation**: [docs/](docs/)
 
 ---
