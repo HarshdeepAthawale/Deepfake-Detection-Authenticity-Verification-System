@@ -107,30 +107,6 @@ pip install -r requirements.txt && python app.py
 | **SUSPICIOUS** | 40-74% | Moderate indicators |
 | **AUTHENTIC** | <40% | Likely genuine |
 
-## Security
-
-- **JWT Authentication**: 24h expiry, 7d refresh tokens
-- **Password**: bcrypt with 12 rounds
-- **OAuth 2.0**: Google login support
-- **RBAC**: Admin, Operative, Analyst roles
-- **Data Protection**: SHA-256 hashing, AES-256 encryption
-- **Rate Limiting**: 100 req/15 min
-- **Security Headers**: Helmet.js (CSP, HSTS, XSS)
-- **Input Validation**: Zod schemas
-- **Audit Trail**: Complete action logging
-
-## Deployment
-
-### Production Checklist
-- [ ] Update `.env` secrets
-- [ ] Enable HTTPS with SSL
-- [ ] Configure firewall (80, 443, 22)
-- [ ] Enable MongoDB auth
-- [ ] Set up regular backups
-- [ ] Configure rate limiting
-- [ ] Review CORS settings
-- [ ] Set up monitoring
-
 ## Project Structure
 
 ```
