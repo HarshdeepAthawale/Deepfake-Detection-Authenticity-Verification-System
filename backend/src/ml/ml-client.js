@@ -132,10 +132,12 @@ export const callMLService = async (perceptionData) => {
         hash: perceptionData.hash,
         mediaType: perceptionData.mediaType,
         metadata: perceptionData.metadata,
-        // Include extracted frames/audio paths if available
         extractedFrames: perceptionData.extractedFrames || [],
         extractedAudio: perceptionData.extractedAudio || null,
         modelVersion: mlConfig.modelVersion,
+        // Tell the ML service how many frames the perception agent extracted so
+        // it can dynamically set its processing ceiling (instead of hardcoding 30).
+        maxFrames: perceptionData.maxFrames || null,
       };
 
       logger.debug(`[ML_CLIENT] Calling ML service (attempt ${attempt}/${mlConfig.retries}): ${inferenceUrl}`);

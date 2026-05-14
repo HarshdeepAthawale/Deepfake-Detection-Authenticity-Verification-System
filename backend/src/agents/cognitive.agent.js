@@ -194,6 +194,16 @@ const generateRichExplanations = (detectionResults, perceptionData) => {
     });
   }
 
+  // Surface ML service diagnostic warnings (e.g. "No faces detected — results may be less accurate")
+  if (detectionResults.warning) {
+    explanations.push({
+      type: 'warning',
+      message: detectionResults.warning,
+      confidence: 'low',
+      details: 'Reported by ML inference service — consider uploading media with clearly visible faces for best accuracy'
+    });
+  }
+
   // Default if no specific findings
   if (explanations.length === 0) {
     if (riskScore > 70) {
@@ -272,6 +282,7 @@ export const generateExplanations = async (detectionResults, perceptionData) => 
       riskScore: riskScore,
       explanations: richExplanations.map(e => e.message), // Simple array for backward compatibility
       detailedExplanations: richExplanations, // Rich format
+      warning: detectionResults.warning || null, // ML service diagnostic (e.g. no faces detected)
       metadata: {
         facialMatch: 100 - (detectionResults.videoScore || 0),
         audioMatch: detectionResults.audioScore > 0 ? 100 - detectionResults.audioScore : 0,
