@@ -8,6 +8,19 @@ export interface User {
   email: string
   operativeId: string
   role: "admin" | "operative" | "analyst"
+  authProvider?: "local" | "google"
+  metadata?: {
+    firstName?: string
+    lastName?: string
+    department?: string
+    clearanceLevel?: "PUBLIC" | "CONFIDENTIAL" | "SECRET" | "TOP_SECRET"
+  }
+  notificationPreferences?: {
+    emailEnabled: boolean
+    emailOnDeepfake: boolean
+    emailOnAll: boolean
+    inAppEnabled: boolean
+  }
 }
 
 interface AuthContextType {
@@ -19,6 +32,7 @@ interface AuthContextType {
   loginWithGoogle: (idToken: string) => Promise<void>
   logout: () => void
   isAuthenticated: boolean
+  updateProfile: (data: Partial<User["metadata"]>) => Promise<User>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -217,6 +231,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [router])
 
+  const updateProfile = useCallback(async (data: Partial<User["metadata"]>) => {
+    if (!user || !token) throw new Error("User not authenticated")
+
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
+
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        let errorMessage = "Failed to update profile"
+        try {
+          const error = await response.json()
+          errorMessage = error.message || errorMessage
+        } catch {}
+        throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+      const updatedUser = result.data?.user || result.data
+
+      localStorage.setItem(USER_KEY, JSON.stringify(updatedUser))
+      setUser(updatedUser)
+
+      return updatedUser
+    } catch (error) {
+      console.error("Update profile error:", error)
+      throw error
+    }
+  }, [user, token])
+
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
@@ -233,6 +284,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signup,
     loginWithGoogle,
     logout,
+    updateProfile,
     isAuthenticated: !!token && !!user,
   }
 
