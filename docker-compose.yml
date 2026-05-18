@@ -5,19 +5,23 @@ services:
     container_name: deepfake-mongodb
     restart: unless-stopped
     ports:
-      - "27019:27017"
+      - "127.0.0.1:27019:27017"
     environment:
       MONGO_INITDB_DATABASE: deepfake-detection
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-sentinel_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?MONGO_ROOT_PASSWORD must be set}
     volumes:
       - mongo-data:/data/db
       - mongodb_config:/data/configdb
     healthcheck:
-      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
+      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - deepfake-network
+    security_opt:
+      - no-new-privileges:true
 
   # Redis Cache & Queue
   redis:
@@ -25,17 +29,27 @@ services:
     container_name: deepfake-redis
     restart: unless-stopped
     ports:
-      - "6380:6379"
+      - "127.0.0.1:6380:6379"
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      --bind 0.0.0.0
+      --protected-mode yes
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
       interval: 10s
       timeout: 3s
       retries: 5
     networks:
       - deepfake-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
 
   # Backend API Service
   backend:
@@ -45,29 +59,29 @@ services:
     container_name: deepfake-backend
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     environment:
       PORT: 3001
-      NODE_ENV: development
-      MONGODB_URI: mongodb://mongodb:27017/deepfake-detection
+      NODE_ENV: production
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-sentinel_admin}:${MONGO_ROOT_PASSWORD:?MONGO_ROOT_PASSWORD must be set}@mongodb:27017/deepfake-detection?authSource=admin
       DB_NAME: deepfake-detection
-      JWT_SECRET: ${JWT_SECRET:-sentinel-deepfake-jwt-secret-key-dev-32chars}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       JWT_EXPIRES_IN: 24h
       JWT_REFRESH_EXPIRES_IN: 7d
       MAX_FILE_SIZE: 500000000
       UPLOAD_PATH: ./uploads
       ALLOWED_MIME_TYPES: video/mp4,video/avi,video/mov,video/webm,audio/mpeg,audio/wav,audio/mp3,image/jpeg,image/png
       BCRYPT_ROUNDS: 12
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-sentinel-encrypt-key-32charssssssssss}
-      ENCRYPTION_IV: ${ENCRYPTION_IV:-sentineliv123456}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set}
+      ENCRYPTION_IV: ${ENCRYPTION_IV:?ENCRYPTION_IV must be set}
       LOG_LEVEL: info
       LOG_FILE_PATH: ./logs/app.log
       RATE_LIMIT_WINDOW_MS: 900000
       RATE_LIMIT_MAX_REQUESTS: 100
-      FRONTEND_URL: http://localhost:3002
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3002}
       GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
       ML_SERVICE_URL: http://ml-service:5000
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379
     volumes:
       - uploads:/app/uploads
       - backend_logs:/app/logs
@@ -86,6 +100,8 @@ services:
       timeout: 3s
       start_period: 40s
       retries: 3
+    security_opt:
+      - no-new-privileges:true
 
   # ML Service (Python Flask)
   ml-service:
@@ -95,7 +111,7 @@ services:
     container_name: deepfake-ml-service
     restart: unless-stopped
     ports:
-      - "5001:5000"
+      - "127.0.0.1:5001:5000"
     environment:
       PORT: 5000
       TRAINING_DATASET_PATH: /app/uploads/training_dataset
@@ -104,9 +120,11 @@ services:
     volumes:
       - uploads:/app/uploads
       - ml-checkpoints:/app/checkpoints
-      - ./ml-service/model:/app/model # Mount model directory
+      - ./ml-service/model:/app/model
     networks:
       - deepfake-network
+    security_opt:
+      - no-new-privileges:true
 
   # ML Service with GPU Support (Optional - requires NVIDIA Docker runtime)
   # To use GPU: docker-compose up ml-service-gpu instead of ml-service
@@ -117,7 +135,7 @@ services:
   #   container_name: deepfake-ml-service-gpu
   #   restart: unless-stopped
   #   ports:
-  #     - "5001:5000"
+  #     - "127.0.0.1:5001:5000"
   #   environment:
   #     PORT: 5000
   #   volumes:
@@ -139,14 +157,14 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-900108796300-1ag26bmttfmh9h6qcdulo8fuonm0dmrc.apps.googleusercontent.com}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     container_name: deepfake-frontend
     restart: unless-stopped
     ports:
       - "3002:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001/api
-      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-900108796300-1ag26bmttfmh9h6qcdulo8fuonm0dmrc.apps.googleusercontent.com}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001/api}
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     depends_on:
       backend:
         condition: service_healthy
@@ -158,16 +176,17 @@ services:
       timeout: 3s
       start_period: 40s
       retries: 3
+    security_opt:
+      - no-new-privileges:true
 
 # Named volumes
 volumes:
   mongo-data:
   mongodb_config:
   redis-data:
-  uploads: # Shared volume for uploads between backend and ML service (includes training_dataset)
-  ml-checkpoints: # ML model checkpoints for fine-tuning
+  uploads:
+  ml-checkpoints:
   backend_logs:
-
 
 networks:
   deepfake-network:
